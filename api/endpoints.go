@@ -8,7 +8,7 @@ func endpoints(r *gin.Engine) {
 	//public
 	r.GET("/movies/:id", h.getThisMovie)
 	r.GET("/movies/list", h.getMoviesWithPage)
-	r.GET("/searchContent", h.searchContent)
+	r.GET("/search", h.searchContent)
 	r.GET("/series/:seriesid", h.getThisSeries)
 	r.GET("/series/list", h.getSeriesWithPage)
 	r.GET("/series/:seriesid/:season", h.getEpisodesForaSeason)

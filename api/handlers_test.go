@@ -271,7 +271,7 @@ func TestGetThisMovie(t *testing.T) {
 	id := "tt0120737"
 	w, c := newTestContext()
 	c.Params = gin.Params{{"id", id}}
-	//
+	//prepare expected
 	movExp := &model.Movie{}
 	movExp.IMDBid = &id
 	movExp.ReleaseDate.Set(time.Date(2022, 05, 10, 0, 0, 0, 0, time.UTC))
@@ -550,6 +550,272 @@ func TestAddToFavorites(t *testing.T) {
 
 }
 
+func TestSearchContent(t *testing.T) {
+	fn := func(pageK, itemsK, pageV, itemsV, nameK, nameV, genreK, shBody string, genreV []string, pageInt, ItemsInt int, retMov *[]model.Movie, retSer *[]model.Series, retErr error) *httptest.ResponseRecorder {
+		mockservice := newMockService()
+		w, c := newTestContext()
+		v := url.Values{}
+		v.Add(pageK, pageV)
+		v.Add(itemsK, itemsV)
+		for _, s := range genreV {
+			v.Add(genreK, s)
+		}
+		req, _ := http.NewRequest("GET", "/search", nil)
+		req.URL.RawQuery = v.Encode()
+		c.Request = req
+		mockservice.mockDBService.On("SearchContent", c, nameV, genreV, pageInt, ItemsInt).Return(retMov, retSer, retErr)
+		serv := bindMockToService(mockservice)
+		serv.searchContent(c)
+		return w
+	}
+	tests := []struct {
+		pK, pV, iK, iV, nK, nV, gK, name string
+		gV                               []string
+		pI, iI                           int
+		rE                               error
+		rM                               *[]model.Movie
+		rS                               *[]model.Series
+		expected                         int
+		shortBody                        string
+		msg                              string
+	}{
+		{
+			name:      "case for successful search",
+			nK:        "name",
+			nV:        "",
+			gK:        "genre",
+			gV:        []string{},
+			pK:        "page",
+			pV:        "1",
+			iK:        "items",
+			iV:        "10",
+			pI:        1,
+			iI:        10,
+			rE:        nil,
+			rM:        new([]model.Movie),
+			rS:        new([]model.Series),
+			expected:  http.StatusOK,
+			shortBody: "",
+			msg:       "it's supposed to get status ok",
+		},
+		{
+			name:      "case for invalid page format",
+			nK:        "name",
+			nV:        "",
+			gK:        "genre",
+			gV:        []string{},
+			pK:        "page",
+			pV:        "1w",
+			iK:        "items",
+			iV:        "10",
+			pI:        1,
+			iI:        10,
+			rE:        nil,
+			rM:        nil,
+			rS:        nil,
+			expected:  http.StatusBadRequest,
+			shortBody: "{\"notification\":\"invalid page format\"}",
+			msg:       "it's supposed to inv page form err",
+		},
+		{
+			name:      "case for invalid items format",
+			nK:        "name",
+			nV:        "",
+			gK:        "genre",
+			gV:        []string{},
+			pK:        "page",
+			pV:        "1",
+			iK:        "items",
+			iV:        "10zxc",
+			pI:        1,
+			iI:        10,
+			rE:        nil,
+			rM:        nil,
+			rS:        nil,
+			expected:  http.StatusBadRequest,
+			shortBody: "{\"notification\":\"invalid items format\"}",
+			msg:       "it's supposed to inv items form err",
+		},
+		{
+			name:      "failure of query",
+			nK:        "name",
+			nV:        "",
+			gK:        "genre",
+			gV:        []string{},
+			pK:        "page",
+			pV:        "1",
+			iK:        "items",
+			iV:        "10",
+			pI:        1,
+			iI:        10,
+			rE:        errors.New("FAIL"),
+			rM:        nil,
+			rS:        nil,
+			expected:  http.StatusInternalServerError,
+			shortBody: "{\"notification\":\"en error occurred\"}",
+			msg:       "it's supposed to failure of query",
+		},
+		{
+			name:      "case of no movie and series have been found",
+			nK:        "name",
+			nV:        "",
+			gK:        "genre",
+			gV:        []string{},
+			pK:        "page",
+			pV:        "1",
+			iK:        "items",
+			iV:        "10",
+			pI:        1,
+			iI:        10,
+			rE:        nil,
+			rM:        nil,
+			rS:        nil,
+			expected:  http.StatusOK,
+			shortBody: "{\"notification\":\"no content found for given filter\"}",
+			msg:       "it's supposed to happen no content found",
+		},
+	}
+
+	for _, test := range tests {
+		w := fn(test.pK, test.iK, test.pV, test.iV, test.nK, test.nV, test.gK, test.shortBody, test.gV, test.pI, test.iI, test.rM, test.rS, test.rE)
+		assert.Equal(t, test.expected, w.Code, test.msg+" for "+test.name)
+		if test.shortBody != "" {
+			r, _ := ioutil.ReadAll(w.Body)
+			assert.Equal(t, test.shortBody, string(r), "body err for"+test.name)
+		}
+
+	}
+}
+
+func TestGetThisSeries(t *testing.T) {
+
+	fn := func(idK, idV string, series *model.Series, seasons *[]model.Seasons, fail error) *httptest.ResponseRecorder {
+		mockservice := newMockService()
+		w, c := newTestContext()
+		c.Params = gin.Params{{idK, idV}}
+		mockservice.mockDBService.On("GetThisSeriesFromDB", c, idV).Return(series, seasons, fail)
+		serv := bindMockToService(mockservice)
+		serv.getThisSeries(c)
+		return w
+	}
+
+	tests := []struct {
+		name, idK, idV string
+		series         *model.Series
+		seasons        *[]model.Seasons
+		err            error
+		expStatus      int
+		msg, shortBody string
+	}{
+		{
+			name:      "case for missing id",
+			idK:       "seriesid",
+			idV:       "",
+			series:    nil,
+			seasons:   nil,
+			err:       nil,
+			expStatus: http.StatusBadRequest,
+			msg:       "it's expected to get bad request=",
+			shortBody: "{\"notification\":\"missing serie id\"}",
+		},
+		{
+			name:      "case for no such series",
+			idK:       "seriesid",
+			idV:       "1",
+			series:    nil,
+			seasons:   nil,
+			err:       pgx.ErrNoRows,
+			expStatus: http.StatusNotFound,
+			msg:       "it's expected to get 404=",
+			shortBody: "{\"notification\":\"no such serie\"}",
+		},
+		{
+			name:      "case for no season for that series",
+			idK:       "seriesid",
+			idV:       "1",
+			series:    new(model.Series),
+			seasons:   nil,
+			err:       errors.New("there is no season for given series"),
+			expStatus: http.StatusOK,
+			msg:       "it's expected to get 200=",
+			shortBody: "", //body check has been neglected
+		},
+		{
+			name:      "case for another failure with query",
+			idK:       "seriesid",
+			idV:       "1",
+			series:    nil,
+			seasons:   nil,
+			err:       errors.New("FAIL"),
+			expStatus: http.StatusInternalServerError,
+			msg:       "it's expected to get internal serv err=",
+			shortBody: "{\"notification\":\"FAIL\"}",
+		},
+		{
+			name:      "case for successful response",
+			idK:       "seriesid",
+			idV:       "1",
+			series:    new(model.Series),
+			seasons:   new([]model.Seasons),
+			err:       nil,
+			expStatus: http.StatusOK,
+			msg:       "it's expected to get 200=",
+			shortBody: "",
+		},
+	}
+	for _, test := range tests {
+		w := fn(test.idK, test.idV, test.series, test.seasons, test.err)
+		assert.Equal(t, test.expStatus, w.Code, test.msg+" for "+test.name)
+		if test.shortBody != "" {
+			r, _ := ioutil.ReadAll(w.Body)
+			assert.Equal(t, test.shortBody, string(r), "body err for"+test.name)
+		}
+	}
+
+}
+
+func TestLogout(t *testing.T) {
+	fn := func(ok bool, err error) *httptest.ResponseRecorder {
+		mockservice := newMockService()
+		w, c := newTestContext()
+		mockservice.mockAuthService.On("DeleteSession", c).Return(ok, err)
+		serv := bindMockToService(mockservice)
+		serv.logout(c)
+		return w
+	}
+
+	tests := []struct {
+		name, msg, shortBody string
+		err                  error
+		expStatus            int
+		retCheck             bool
+	}{
+		{
+			name:      "case for failure of session deletion",
+			err:       errors.New("FAIL"),
+			retCheck:  false,
+			expStatus: http.StatusInternalServerError,
+			shortBody: "{\"notification\":\"FAIL\"}",
+			msg:       "it's expected to get intern serv err",
+		},
+		{
+			name:      "case for success",
+			err:       nil,
+			retCheck:  true,
+			expStatus: http.StatusOK,
+			shortBody: "{\"notification\":\"logged out successfully\"}",
+			msg:       "it's expected to get success for= ",
+		},
+	}
+
+	for _, test := range tests {
+		w := fn(test.retCheck, test.err)
+		assert.Equal(t, test.expStatus, w.Code, test.msg+test.name)
+		r, _ := ioutil.ReadAll(w.Body)
+		assert.Equal(t, test.shortBody, string(r), test.msg+test.name)
+	}
+}
+
 func (s *mockAuthService) InitializeCache() {
 
 }
@@ -569,7 +835,8 @@ func (s *mockAuthService) CheckSession(c *gin.Context) bool {
 }
 
 func (s *mockAuthService) DeleteSession(c *gin.Context) (bool, error) {
-	return false, nil
+	args := s.Called(c)
+	return args.Bool(0), args.Error(1)
 }
 
 func (s *mockAuthService) CheckAdminForLoggedIn(c *gin.Context, username string) bool {
@@ -599,7 +866,20 @@ func (s *mockDBService) GetThisMovieFromDB(c *gin.Context, id string) (*model.Mo
 }
 
 func (s *mockDBService) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series, *[]model.Seasons, error) {
-	return nil, nil, nil
+	args := s.Called(c, id)
+	var ret1 *model.Series
+	var ret2 *[]model.Seasons
+	if args.Get(0) == nil {
+		ret1 = nil
+	} else {
+		ret1 = args.Get(0).(*model.Series)
+	}
+	if args.Get(1) == nil {
+		ret2 = nil
+	} else {
+		ret2 = args.Get(1).(*[]model.Seasons)
+	}
+	return ret1, ret2, args.Error(2)
 }
 
 func (s *mockDBService) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN string) (*[]model.Episodes, error) {
@@ -619,7 +899,14 @@ func (s *mockDBService) GetSeriesListWithPage(c *gin.Context, page, items int) (
 }
 
 func (s *mockDBService) SearchContent(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
-	return nil, nil, nil
+	genres = []string{}
+	args := s.Called(c, name, genres, page, items)
+
+	//cases for unary null is neglected
+	if args.Get(0) == nil && args.Get(1) == nil {
+		return nil, nil, args.Error(2)
+	}
+	return args.Get(0).(*[]model.Movie), args.Get(1).(*[]model.Series), args.Error(2)
 }
 
 func (s *mockDBService) FindSimilarContent(c *gin.Context, id, cType string) (*[]model.Movie, *[]model.Series, error) {

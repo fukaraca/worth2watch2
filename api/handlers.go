@@ -130,11 +130,11 @@ func (s *service) login(c *gin.Context) {
 
 //Logout handler
 func (s *service) logout(c *gin.Context) {
-	ok, err := s.DeleteSession(c)
-	if err != nil || !ok {
+	_, err := s.DeleteSession(c)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"notification": err.Error()})
-		log.Println("session couldn't be deleted:", err)
+			"notification": err.Error(),
+		})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -342,6 +342,12 @@ func (s *service) getThisMovie(c *gin.Context) {
 //GetThisSeries is a handler function for responsing a specific serie with its seasons
 func (s *service) getThisSeries(c *gin.Context) {
 	id := c.Param("seriesid")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"notification": "missing serie id",
+		})
+		return
+	}
 	series, seasons, err := s.GetThisSeriesFromDB(c, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -355,9 +361,8 @@ func (s *service) getThisSeries(c *gin.Context) {
 				"notification": err.Error(),
 			})
 		} else {
-			log.Println("get this movie failed for id: ", id, " err: ", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"notification": err,
+				"notification": err.Error(),
 			})
 			return
 		}
