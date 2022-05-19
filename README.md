@@ -18,7 +18,7 @@ Features:
 ## Get Started
 
 ```
-git clone https://github.com/fukaraca/worth2watch.git
+git clone https://github.com/fukaraca/worth2watch2.git
 ```
 
 

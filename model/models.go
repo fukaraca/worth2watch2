@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/fukaraca/worth2watch/config"
+	"github.com/fukaraca/worth2watch2/config"
 	"github.com/jackc/pgtype"
 )
 

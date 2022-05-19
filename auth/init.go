@@ -1,17 +1,19 @@
 package auth
 
 import (
-	"github.com/fukaraca/worth2watch/config"
+	"github.com/fukaraca/worth2watch2/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/net/context"
 	"log"
 )
 
-var redis_Host = config.GetEnv.GetString("REDIS_HOST")
-var redis_Port = config.GetEnv.GetString("REDIS_PORT")
-var redis_Password = config.GetEnv.GetString("REDIS_PASSWORD")
-var redis_DB = config.GetEnv.GetInt("REDIS_DB")
+var (
+	redis_Host     = config.GetEnv.GetString("REDIS_HOST")
+	redis_Port     = config.GetEnv.GetString("REDIS_PORT")
+	redis_Password = config.GetEnv.GetString("REDIS_PASSWORD")
+	redis_DB       = config.GetEnv.GetInt("REDIS_DB")
+)
 
 type authImp struct {
 	client *redis.Client
@@ -26,8 +28,6 @@ type AuthServer interface {
 	CloseCacheConnection()
 	InitializeCache()
 }
-
-//var AuthService AuthServer = &authImp{}
 
 func (chc *authImp) InitializeCache() {
 

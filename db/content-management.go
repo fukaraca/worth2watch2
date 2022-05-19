@@ -2,8 +2,8 @@ package db
 
 import (
 	"fmt"
-	"github.com/fukaraca/worth2watch/api/admin"
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/api/admin"
+	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
 	"log"

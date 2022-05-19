@@ -1,1 +1,1 @@
-CREATE DATABASE worth2watchdb;
+CREATE DATABASE worth2watch2db;

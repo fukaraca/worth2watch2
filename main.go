@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/fukaraca/worth2watch/api"
-	"github.com/fukaraca/worth2watch/auth"
-	"github.com/fukaraca/worth2watch/db"
+	"github.com/fukaraca/worth2watch2/api"
+	"github.com/fukaraca/worth2watch2/auth"
+	"github.com/fukaraca/worth2watch2/db"
 	"log"
 )
 

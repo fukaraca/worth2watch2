@@ -13,4 +13,4 @@ FROM alpine as secondBuilder
 COPY --from=builder /src/ /app
 WORKDIR /app
 EXPOSE 8080
-ENTRYPOINT /app/worth2watch
+ENTRYPOINT /app/worth2watch2

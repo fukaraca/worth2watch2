@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"

@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/fukaraca/worth2watch/db"
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/db"
+	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofrs/uuid"

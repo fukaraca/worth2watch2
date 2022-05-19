@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/net/context"

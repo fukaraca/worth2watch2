@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
 	"log"

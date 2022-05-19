@@ -1,4 +1,4 @@
-module github.com/fukaraca/worth2watch
+module github.com/fukaraca/worth2watch2
 
 go 1.18
 

@@ -1,10 +1,10 @@
 package api
 
 import (
-	"github.com/fukaraca/worth2watch/auth"
-	"github.com/fukaraca/worth2watch/db"
-	"github.com/fukaraca/worth2watch/model"
-	"github.com/fukaraca/worth2watch/util"
+	"github.com/fukaraca/worth2watch2/auth"
+	"github.com/fukaraca/worth2watch2/db"
+	"github.com/fukaraca/worth2watch2/model"
+	"github.com/fukaraca/worth2watch2/util"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/ratelimit"
@@ -18,10 +18,6 @@ type service struct {
 	auth.AuthServer
 	util.Utilizer
 }
-
-var (
-	h *service
-)
 
 func newService() *service {
 	return &service{
@@ -60,7 +56,6 @@ func setupRouter() *gin.Engine {
 	}
 	r.Use(leakBucket(rLimit))
 	r.Use(requestid.New())
-	h = newService()
-	endpoints(r)
+	r = endpoints(r, newService())
 	return r
 }

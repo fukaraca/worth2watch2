@@ -3,7 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fukaraca/worth2watch/model"
+	"github.com/fukaraca/worth2watch2/model"
 	"io"
 	"log"
 	"net/http"
