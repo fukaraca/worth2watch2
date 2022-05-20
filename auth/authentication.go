@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/fukaraca/worth2watch2/db"
 	"github.com/fukaraca/worth2watch2/model"
@@ -13,25 +14,22 @@ import (
 )
 
 //CheckCookie function checks validation of cookie. Return TRUE if it's valid
-func (chc *authImp) CheckCookie(c *gin.Context, toBeChecked, userId string) bool {
+func (chc *authImp) CheckCookie(c *gin.Context, toBeChecked, userId string) (bool, error) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-	cookieVal, err := chc.client.Do(ctx, "GET", toBeChecked).Result()
+	cookieVal, err := chc.client.Do(ctx, "get", toBeChecked).Result()
 
 	switch {
 	case err == redis.Nil:
-		log.Println("Cookie does not exist!")
-		return false
+		return false, err
 	case err != nil:
-		log.Println("Get Failed:", err)
-		return false
-	case cookieVal == "":
-		log.Println("Cookie value is empty!")
-		return false
+		return false, err
+	case cookieVal.(string) == "":
+		return false, errors.New("cookie val is empty")
 	case userId != cookieVal.(string):
-		return false
+		return false, errors.New("invalid cookie for given user")
 	}
-	return true
+	return true, nil
 }
 
 //CreateSession creates and assigns cookie for user who logged in successfully. Session-token id will be stored in cache.
@@ -56,25 +54,22 @@ func (chc *authImp) CreateSession(username string, c *gin.Context) {
 }
 
 //CheckSession function checks validation of session. If a request has no cookie or cookie is not valid then returns FALSE
-func (chc *authImp) CheckSession(c *gin.Context) bool {
+func (chc *authImp) CheckSession(c *gin.Context) (bool, error) {
 	toBeChecked, err := c.Cookie("session_token")
 	if err == http.ErrNoCookie {
-		log.Println("No cookie error: ", err)
-		return false
+		return false, err
 	}
 
 	toBeCheckedId, err := c.Cookie("uid")
 	if err == http.ErrNoCookie {
-		log.Println("No cookie error: ", err)
-		return false
+		return false, err
 	}
 	//tobeCheckedId variable is like supersecret private key
-	if isCookieValid := chc.CheckCookie(c, toBeChecked, toBeCheckedId); !isCookieValid {
-		log.Println("Cookie is not valid", toBeChecked)
-		return false
+	if isCookieValid, err := chc.CheckCookie(c, toBeChecked, toBeCheckedId); !isCookieValid {
+		return false, err
 	}
 
-	return true
+	return true, nil
 }
 
 //DeleteSession deletes the session as named
@@ -108,8 +103,8 @@ func (chc *authImp) CheckAdminForLoggedIn(c *gin.Context, username string) bool 
 	defer cancel()
 	_, err := chc.client.Do(ctx, "get", "admin-"+username).Result()
 	//todo check if get or GET makes any diff
+
 	if err != nil {
-		//log.Println("query cache for admin register failed:", err)
 		return false
 	}
 	return true

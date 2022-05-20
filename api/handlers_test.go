@@ -95,7 +95,7 @@ func TestAuth(t *testing.T) {
 		ctx.String(201, "this is a test")
 	}
 	//succcesfull auth returns same handlerfunc. we can execute it by passing c into
-	mockservice.mockCacheService.On("CheckSession", c).Return(true)
+	mockservice.mockCacheService.On("CheckSession", c).Return(true, nil)
 	serv := bindMockToService(mockservice)
 	serv.auth(fnc)(c)
 
@@ -108,7 +108,7 @@ func TestAuth(t *testing.T) {
 	w, c = newTestContext()
 	req, _ = http.NewRequest("GET", "/", nil)
 	c.Request = req //and assing it
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	serv.auth(fnc)(c)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
@@ -121,7 +121,7 @@ func TestCheckRegistration(t *testing.T) {
 	w, c := newTestContext()
 	req, _ := http.NewRequest("POST", "/register", nil)
 	c.Request = req //and assing it
-	mockservice.mockCacheService.On("CheckSession", c).Return(true)
+	mockservice.mockCacheService.On("CheckSession", c).Return(true, nil)
 	serv := bindMockToService(mockservice)
 	serv.checkRegistration(c)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -148,7 +148,7 @@ func TestCheckRegistration(t *testing.T) {
 	passw := "password"
 	newUser := new(model.User)
 
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	mockservice.mockUtils.On("Striper", uname).Return(&uname)
 	mockservice.mockUtils.On("Striper", email).Return(&email)
 	mockservice.mockUtils.On("Striper", passw).Return(&passw)
@@ -170,7 +170,7 @@ func TestCheckRegistration(t *testing.T) {
     "isAdmin":false
 }`
 	fn(userinfo)
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 
 	serv = bindMockToService(mockservice)
 	serv.checkRegistration(c)
@@ -188,7 +188,7 @@ func TestCheckRegistration(t *testing.T) {
 }`
 	fn(userinfo)
 
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	mockservice.mockUtils.On("Striper", uname).Return(&uname)
 	mockservice.mockUtils.On("Striper", email).Return(&email)
 	mockservice.mockUtils.On("Striper", passw).Return(&passw)
@@ -218,7 +218,7 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"pass1"},
 	}
 	fn(formData)
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	mockservice.mockRepoService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
 	mockservice.mockUtils.On("CheckPasswordHash", "pass1", "hashedpass").Return(true)
 	mockservice.mockRepoService.On("UpdateLastLogin", c, time.Now().Truncate(time.Minute), "user1").Return(nil)
@@ -237,7 +237,7 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"pass1"},
 	}
 	fn(formData)
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	mockservice.mockRepoService.On("QueryLogin", c, "userThatNotExist").Return("", pgx.ErrNoRows)
 	serv.login(c)
 
@@ -252,7 +252,7 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"passThatWrong"},
 	}
 	fn(formData)
-	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false, nil)
 	mockservice.mockRepoService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
 	mockservice.mockUtils.On("CheckPasswordHash", "passThatWrong", "hashedpass").Return(false)
 
@@ -820,17 +820,17 @@ func (s *mockCacheService) InitializeCache() {
 
 }
 
-func (s *mockCacheService) CheckCookie(c *gin.Context, toBeChecked, userId string) bool {
-	return false
+func (s *mockCacheService) CheckCookie(c *gin.Context, toBeChecked, userId string) (bool, error) {
+	return false, nil
 }
 
 func (s *mockCacheService) CreateSession(username string, c *gin.Context) {
 
 }
 
-func (s *mockCacheService) CheckSession(c *gin.Context) bool {
+func (s *mockCacheService) CheckSession(c *gin.Context) (bool, error) {
 	args := s.Called(c)
-	return args.Bool(0)
+	return args.Bool(0), args.Error(1)
 
 }
 

@@ -17,7 +17,7 @@ import (
 func (s *service) auth(fn gin.HandlerFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Println("Req ID:", requestid.Get(c))
-		if !s.CheckSession(c) {
+		if ok, _ := s.CheckSession(c); !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"notification": "you must login",
 			})
@@ -33,8 +33,7 @@ func (s *service) auth(fn gin.HandlerFunc) gin.HandlerFunc {
 //Data must be POSTed as "form data".
 //Leading or trailing whitespaces will be handled by frontend
 func (s *service) checkRegistration(c *gin.Context) {
-	if s.CheckSession(c) {
-
+	if ok, _ := s.CheckSession(c); ok {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"notification": "already logged in",
 		})
@@ -94,7 +93,7 @@ func (s *service) checkRegistration(c *gin.Context) {
 //Login is handler function for login process.
 //It requires form-data for 'logUsername' and 'logPassword' keys.
 func (s *service) login(c *gin.Context) {
-	if s.CheckSession(c) {
+	if ok, _ := s.CheckSession(c); ok {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"notification": "already logged in",
 		})

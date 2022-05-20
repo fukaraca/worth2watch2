@@ -31,12 +31,12 @@ func (dbi *dbImp) QueryLogin(c *gin.Context, username string) (string, error) {
 	return "", err
 }
 
-func ExpIsAdmin() {
-
-}
-
 //IsAdmin checks DBService for given user whether he/she is admin or not
 func IsAdmin(c *gin.Context, username string) (bool, error) {
+	if gin.Mode() == gin.TestMode {
+		return false, nil
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	isAdmin := false

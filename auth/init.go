@@ -20,9 +20,9 @@ type authImp struct {
 }
 
 type Cache interface {
-	CheckCookie(c *gin.Context, toBeChecked, userId string) bool
+	CheckCookie(c *gin.Context, toBeChecked, userId string) (bool, error)
 	CreateSession(username string, c *gin.Context)
-	CheckSession(c *gin.Context) bool
+	CheckSession(c *gin.Context) (bool, error)
 	DeleteSession(c *gin.Context) (bool, error)
 	CheckAdminForLoggedIn(c *gin.Context, username string) bool
 	CloseCacheConnection()
@@ -59,8 +59,4 @@ func NewCache() *authImp {
 	client := &authImp{}
 	client.initializeCache()
 	return client
-}
-
-func NewTestCache() *authImp {
-	return &authImp{}
 }
