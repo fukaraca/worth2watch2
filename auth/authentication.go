@@ -80,25 +80,22 @@ func (chc *authImp) CheckSession(c *gin.Context) bool {
 //DeleteSession deletes the session as named
 func (chc *authImp) DeleteSession(c *gin.Context) (bool, error) {
 	toBeChecked, _ := c.Cookie("session_token")
-	username, _ := c.Cookie("session_token")
+	username, _ := c.Cookie("uid")
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-	res, err := chc.client.Do(ctx, "DEL", toBeChecked).Result()
+	res, err := chc.client.Do(ctx, "del", toBeChecked).Result()
 	if err != nil {
-		log.Println("session deletion err:", err)
 		return false, fmt.Errorf("session deletion err:%s", err.Error())
 	}
 	if chc.CheckAdminForLoggedIn(c, username) {
 		res, err = chc.client.Do(ctx, "DEL", "admin-"+username).Result()
 		if err != nil {
-			log.Println("session deletion err for admin:", err)
 			return false, fmt.Errorf("session deletion err:%s", err.Error())
 		}
 	}
 
 	log.Printf("%v item removed in order to delete session.\n", res)
-
 	c.SetCookie("session_token", "", -1, "/", model.ServerHost, false, true)
 	c.SetCookie("uid", "", -1, "/", model.ServerHost, false, true)
 
@@ -109,13 +106,11 @@ func (chc *authImp) DeleteSession(c *gin.Context) (bool, error) {
 func (chc *authImp) CheckAdminForLoggedIn(c *gin.Context, username string) bool {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-	cookieVal, err := chc.client.Do(ctx, "GET", "admin-"+username).Result()
+	_, err := chc.client.Do(ctx, "get", "admin-"+username).Result()
+	//todo check if get or GET makes any diff
 	if err != nil {
 		//log.Println("query cache for admin register failed:", err)
 		return false
 	}
-	if cookieVal.(string) == "1" {
-		return true
-	}
-	return false
+	return true
 }

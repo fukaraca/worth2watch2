@@ -14,25 +14,25 @@ import (
 )
 
 type service struct {
-	db.DBserver
-	auth.AuthServer
+	db.Repository
+	auth.Cache
 	util.Utilizer
 }
 
-func newService() *service {
+func NewServer() *service {
 	return &service{
-		DBserver:   db.NewDBServer(),
-		AuthServer: auth.NewAuthServer(),
+		Repository: db.NewRepository(),
+		Cache:      auth.NewCache(),
 		Utilizer:   util.NewUtilizer(),
 	}
 }
 
-//ListenRouter initiates the server
-func ListenRouter() error {
-	return setupRouter().Run(model.ServerPort)
+//ListenRouter initiates and listens router
+func (s *service) ListenRouter() error {
+	return setupRouter(s).Run(model.ServerPort)
 }
 
-func setupRouter() *gin.Engine {
+func setupRouter(s *service) *gin.Engine {
 	//logger middleware teed to log.file
 	logfile, err := os.OpenFile("./logs/log.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -56,6 +56,6 @@ func setupRouter() *gin.Engine {
 	}
 	r.Use(leakBucket(rLimit))
 	r.Use(requestid.New())
-	r = endpoints(r, newService())
+	r = endpoints(r, s)
 	return r
 }

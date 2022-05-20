@@ -14,21 +14,18 @@ import (
 	"time"
 )
 
-var db_Host = config.GetEnv.GetString("DB_HOST")
-var db_Port = config.GetEnv.GetString("DB_PORT")
-var db_Name = config.GetEnv.GetString("DB_NAME")
-var db_User = config.GetEnv.GetString("DB_USER")
-var db_Password = config.GetEnv.GetString("DB_PASSWORD")
-
 var (
-	conn *pgxpool.Pool
+	conn        *pgxpool.Pool
+	db_Host     = config.GetEnv.GetString("DB_HOST")
+	db_Port     = config.GetEnv.GetString("DB_PORT")
+	db_Name     = config.GetEnv.GetString("DB_NAME")
+	db_User     = config.GetEnv.GetString("DB_USER")
+	db_Password = config.GetEnv.GetString("DB_PASSWORD")
 )
-
-//var DBService DBserver = &dbImp{}
 
 type dbImp struct{}
 
-type DBserver interface {
+type Repository interface {
 	GetThisMovieFromDB(c *gin.Context, id string) (*model.Movie, error)
 	GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series, *[]model.Seasons, error)
 	GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN string) (*[]model.Episodes, error)
@@ -40,7 +37,6 @@ type DBserver interface {
 	GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error)
 	SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error)
 	QueryLogin(c *gin.Context, username string) (string, error)
-	//IsAdmin(c *gin.Context, username string) (bool, error)
 	CreateNewUser(c *gin.Context, newUser *model.User) error
 	UpdateLastLogin(c *gin.Context, lastLoginTime time.Time, logUsername string) error
 	UpdateUserInfo(c *gin.Context, firstname, lastname, username string) error
@@ -50,12 +46,11 @@ type DBserver interface {
 	AddMovieContentWithStruct(ctx context2.Context, movie *model.Movie) error
 	AddSeriesContentWithStruct(ctx context2.Context, series *model.Series) error
 	DeleteContent(c *gin.Context, id, contentType string) error
-	InitializeDB()
 	CloseDB()
 }
 
 //InitializeDB function creates a connection pool to PSQL DBService.
-func (dbi *dbImp) InitializeDB() {
+func (dbi *dbImp) initializeDB() {
 
 	databaseURL := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", db_Host, db_Port, db_User, db_Password, db_Name)
 	pool, err := pgxpool.Connect(context.Background(), databaseURL)
@@ -69,7 +64,6 @@ func (dbi *dbImp) InitializeDB() {
 	}
 
 	conn = pool
-	checkIfInitialized()
 }
 
 func (dbi *dbImp) CloseDB() {
@@ -77,7 +71,7 @@ func (dbi *dbImp) CloseDB() {
 }
 
 //CheckIfInitialized functions checks existance of tables and creates if necessary.
-func checkIfInitialized() {
+func (dbi *dbImp) checkIfInitialized() {
 	sqlScript, err := os.ReadFile("./db/init.sql")
 	if err != nil {
 		log.Fatalln("init.sql file couldn't be read: ", err)
@@ -92,6 +86,9 @@ func checkIfInitialized() {
 
 }
 
-func NewDBServer() *dbImp {
-	return &dbImp{}
+func NewRepository() *dbImp {
+	database := &dbImp{}
+	database.initializeDB()
+	database.checkIfInitialized()
+	return database
 }

@@ -25,10 +25,10 @@ import (
 	"time"
 )
 
-type mockAuthService struct {
+type mockCacheService struct {
 	mock.Mock
 }
-type mockDBService struct {
+type mockRepoService struct {
 	mock.Mock
 }
 
@@ -37,23 +37,23 @@ type mockUtils struct {
 }
 
 type mockService struct {
-	*mockAuthService
-	*mockDBService
+	*mockCacheService
+	*mockRepoService
 	*mockUtils
 }
 
 func newMockService() *mockService {
 	return &mockService{
-		mockAuthService: &mockAuthService{},
-		mockDBService:   &mockDBService{},
-		mockUtils:       &mockUtils{},
+		mockCacheService: &mockCacheService{},
+		mockRepoService:  &mockRepoService{},
+		mockUtils:        &mockUtils{},
 	}
 }
 
 func bindMockToService(m *mockService) *service {
 	return &service{
-		DBserver:   m.mockDBService,
-		AuthServer: m.mockAuthService,
+		Repository: m.mockRepoService,
+		Cache:      m.mockCacheService,
 		Utilizer:   m.mockUtils,
 	}
 }
@@ -95,7 +95,7 @@ func TestAuth(t *testing.T) {
 		ctx.String(201, "this is a test")
 	}
 	//succcesfull auth returns same handlerfunc. we can execute it by passing c into
-	mockservice.mockAuthService.On("CheckSession", c).Return(true)
+	mockservice.mockCacheService.On("CheckSession", c).Return(true)
 	serv := bindMockToService(mockservice)
 	serv.auth(fnc)(c)
 
@@ -108,7 +108,7 @@ func TestAuth(t *testing.T) {
 	w, c = newTestContext()
 	req, _ = http.NewRequest("GET", "/", nil)
 	c.Request = req //and assing it
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
 	serv.auth(fnc)(c)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
@@ -121,7 +121,7 @@ func TestCheckRegistration(t *testing.T) {
 	w, c := newTestContext()
 	req, _ := http.NewRequest("POST", "/register", nil)
 	c.Request = req //and assing it
-	mockservice.mockAuthService.On("CheckSession", c).Return(true)
+	mockservice.mockCacheService.On("CheckSession", c).Return(true)
 	serv := bindMockToService(mockservice)
 	serv.checkRegistration(c)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -148,12 +148,12 @@ func TestCheckRegistration(t *testing.T) {
 	passw := "password"
 	newUser := new(model.User)
 
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
 	mockservice.mockUtils.On("Striper", uname).Return(&uname)
 	mockservice.mockUtils.On("Striper", email).Return(&email)
 	mockservice.mockUtils.On("Striper", passw).Return(&passw)
 	mockservice.mockUtils.On("HashPassword", passw).Return("somePass", nil)
-	mockservice.mockDBService.On("CreateNewUser", c, newUser).Return(nil)
+	mockservice.mockRepoService.On("CreateNewUser", c, newUser).Return(nil)
 
 	serv = bindMockToService(mockservice)
 	serv.checkRegistration(c)
@@ -170,7 +170,7 @@ func TestCheckRegistration(t *testing.T) {
     "isAdmin":false
 }`
 	fn(userinfo)
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
 
 	serv = bindMockToService(mockservice)
 	serv.checkRegistration(c)
@@ -188,12 +188,12 @@ func TestCheckRegistration(t *testing.T) {
 }`
 	fn(userinfo)
 
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
 	mockservice.mockUtils.On("Striper", uname).Return(&uname)
 	mockservice.mockUtils.On("Striper", email).Return(&email)
 	mockservice.mockUtils.On("Striper", passw).Return(&passw)
 	mockservice.mockUtils.On("HashPassword", passw).Return("somePass", nil)
-	mockservice.mockDBService.On("CreateNewUser", c, newUser).Return(errors.New("some failure"))
+	mockservice.mockRepoService.On("CreateNewUser", c, newUser).Return(errors.New("some failure"))
 
 	serv = bindMockToService(mockservice)
 	serv.checkRegistration(c)
@@ -218,11 +218,11 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"pass1"},
 	}
 	fn(formData)
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
-	mockservice.mockDBService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockRepoService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
 	mockservice.mockUtils.On("CheckPasswordHash", "pass1", "hashedpass").Return(true)
-	mockservice.mockDBService.On("UpdateLastLogin", c, time.Now().Truncate(time.Minute), "user1").Return(nil)
-	mockservice.mockAuthService.On("CreateSession", "user1", c).Return()
+	mockservice.mockRepoService.On("UpdateLastLogin", c, time.Now().Truncate(time.Minute), "user1").Return(nil)
+	mockservice.mockCacheService.On("CreateSession", "user1", c).Return()
 
 	serv := bindMockToService(mockservice)
 	serv.login(c)
@@ -237,8 +237,8 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"pass1"},
 	}
 	fn(formData)
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
-	mockservice.mockDBService.On("QueryLogin", c, "userThatNotExist").Return("", pgx.ErrNoRows)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockRepoService.On("QueryLogin", c, "userThatNotExist").Return("", pgx.ErrNoRows)
 	serv.login(c)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -252,8 +252,8 @@ func TestLogin(t *testing.T) {
 		"logPassword": []string{"passThatWrong"},
 	}
 	fn(formData)
-	mockservice.mockAuthService.On("CheckSession", c).Return(false)
-	mockservice.mockDBService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
+	mockservice.mockCacheService.On("CheckSession", c).Return(false)
+	mockservice.mockRepoService.On("QueryLogin", c, "user1").Return("hashedpass", nil)
 	mockservice.mockUtils.On("CheckPasswordHash", "passThatWrong", "hashedpass").Return(false)
 
 	serv.login(c)
@@ -276,7 +276,7 @@ func TestGetThisMovie(t *testing.T) {
 	movExp.IMDBid = &id
 	movExp.ReleaseDate.Set(time.Date(2022, 05, 10, 0, 0, 0, 0, time.UTC))
 	//
-	mockservice.mockDBService.On("GetThisMovieFromDB", c, id).Return(movExp, nil)
+	mockservice.mockRepoService.On("GetThisMovieFromDB", c, id).Return(movExp, nil)
 	serv := bindMockToService(mockservice)
 	serv.getThisMovie(c)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -298,7 +298,7 @@ func TestGetThisMovie(t *testing.T) {
 	}
 	movExp = admin.GetMovie(tmdb_id)
 	//
-	mockservice.mockDBService.On("GetThisMovieFromDB", c, "tt0111161").Return(movExp, nil)
+	mockservice.mockRepoService.On("GetThisMovieFromDB", c, "tt0111161").Return(movExp, nil)
 	serv.getThisMovie(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -315,7 +315,7 @@ func TestGetThisMovie(t *testing.T) {
 	//////////last case unsuccessful query for non-existed imdb-id
 	w, c = newTestContext()
 	c.Params = gin.Params{{"id", ""}}
-	mockservice.mockDBService.On("GetThisMovieFromDB", c, "").Return(nil, pgx.ErrNoRows)
+	mockservice.mockRepoService.On("GetThisMovieFromDB", c, "").Return(nil, pgx.ErrNoRows)
 	serv.getThisMovie(c)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
@@ -333,7 +333,7 @@ func TestGetMoviesWithPage(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/movies/list", nil)
 		req.URL.RawQuery = v.Encode()
 		c.Request = req
-		mockservice.mockDBService.On("GetMoviesListWithPage", c, pageInt, ItemsInt).Return(retMov, retErr)
+		mockservice.mockRepoService.On("GetMoviesListWithPage", c, pageInt, ItemsInt).Return(retMov, retErr)
 		serv := bindMockToService(mockservice)
 		serv.getMoviesWithPage(c)
 		return w
@@ -438,7 +438,7 @@ func TestAddContentWithJSON(t *testing.T) {
 
 	contentStr := `{"adult":false,"backdrop_path":"/vRQnzOn4HjIMX4LBq9nHhFXbsSu.jpg","belongs_to_collection":{"id":119,"name":"The Lord of the Rings Collection","poster_path":"/nSNle6UJNNuEbglNvXt67m1a1Yn.jpg","backdrop_path":"/bccR2CGTWVVSZAG0yqmy3DIvhTX.jpg"},"budget":93000000,"genres":[{"id":12,"name":"Adventure"},{"id":14,"name":"Fantasy"},{"id":28,"name":"Action"}],"homepage":"http://www.lordoftherings.net/","id":120,"imdb_id":"tt0120737","original_language":"en","original_title":"The Lord of the Rings: The Fellowship of the Ring","overview":"Young hobbit Frodo Baggins, after inheriting a mysterious ring from his uncle Bilbo, must leave his home in order to keep it from falling into the hands of its evil creator. Along the way, a fellowship is formed to protect the ringbearer and make sure that the ring arrives at its final destination: Mt. Doom, the only place where it can be destroyed.","popularity":118.779,"poster_path":"/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg","production_companies":[{"id":12,"logo_path":"/iaYpEp3LQmb8AfAtmTvpqd4149c.png","name":"New Line Cinema","origin_country":"US"},{"id":11,"logo_path":"/6FAuASQHybRkZUk08p9PzSs9ezM.png","name":"WingNut Films","origin_country":"NZ"},{"id":5237,"logo_path":null,"name":"The Saul Zaentz Company","origin_country":"US"}],"production_countries":[{"iso_3166_1":"NZ","name":"New Zealand"},{"iso_3166_1":"US","name":"United States of America"}],"release_date":"2001-12-18","revenue":871368364,"runtime":179,"spoken_languages":[{"english_name":"English","iso_639_1":"en","name":"English"}],"status":"Released","tagline":"One ring to rule them all","title":"The Lord of the Rings: The Fellowship of the Ring","video":false,"vote_average":8.4,"vote_count":20776}`
 	fn(contentStr, "movie")
-	mockservice.mockAuthService.On("CheckAdminForLoggedIn", c, "").Return(false)
+	mockservice.mockCacheService.On("CheckAdminForLoggedIn", c, "").Return(false)
 
 	serv := bindMockToService(mockservice)
 	serv.addContentWithJSON(c)
@@ -450,7 +450,7 @@ func TestAddContentWithJSON(t *testing.T) {
 	/////////secondly check for invalid content type
 	w, c = newTestContext()
 	fn(contentStr, "invalid content")
-	mockservice.mockAuthService.On("CheckAdminForLoggedIn", c, "").Return(true)
+	mockservice.mockCacheService.On("CheckAdminForLoggedIn", c, "").Return(true)
 	serv = bindMockToService(mockservice)
 	serv.addContentWithJSON(c)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -460,8 +460,8 @@ func TestAddContentWithJSON(t *testing.T) {
 	//////////finally check for successful attempt
 	w, c = newTestContext()
 	fn(contentStr, "movie")
-	mockservice.mockAuthService.On("CheckAdminForLoggedIn", c, "").Return(true)
-	mockservice.mockDBService.On("AddMovieContentWithStruct", c, new(model.Movie)).Return(nil)
+	mockservice.mockCacheService.On("CheckAdminForLoggedIn", c, "").Return(true)
+	mockservice.mockRepoService.On("AddMovieContentWithStruct", c, new(model.Movie)).Return(nil)
 	serv = bindMockToService(mockservice)
 	serv.addContentWithJSON(c)
 	assert.Equal(t, http.StatusCreated, w.Code)
@@ -478,7 +478,7 @@ func TestAddToFavorites(t *testing.T) {
 		requ, _ := http.NewRequest("POST", "/favorites", strings.NewReader(form.Encode()))
 		requ.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		c.Request = requ
-		mockservice.mockDBService.On("AddContentToFavorites", c, "", "").Return(ret)
+		mockservice.mockRepoService.On("AddContentToFavorites", c, "", "").Return(ret)
 		serv := bindMockToService(mockservice)
 		serv.addToFavorites(c)
 		assert.Equal(t, status, w.Code)
@@ -563,7 +563,7 @@ func TestSearchContent(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/search", nil)
 		req.URL.RawQuery = v.Encode()
 		c.Request = req
-		mockservice.mockDBService.On("SearchContent", c, nameV, genreV, pageInt, ItemsInt).Return(retMov, retSer, retErr)
+		mockservice.mockRepoService.On("SearchContent", c, nameV, genreV, pageInt, ItemsInt).Return(retMov, retSer, retErr)
 		serv := bindMockToService(mockservice)
 		serv.searchContent(c)
 		return w
@@ -693,7 +693,7 @@ func TestGetThisSeries(t *testing.T) {
 		mockservice := newMockService()
 		w, c := newTestContext()
 		c.Params = gin.Params{{idK, idV}}
-		mockservice.mockDBService.On("GetThisSeriesFromDB", c, idV).Return(series, seasons, fail)
+		mockservice.mockRepoService.On("GetThisSeriesFromDB", c, idV).Return(series, seasons, fail)
 		serv := bindMockToService(mockservice)
 		serv.getThisSeries(c)
 		return w
@@ -778,7 +778,7 @@ func TestLogout(t *testing.T) {
 	fn := func(ok bool, err error) *httptest.ResponseRecorder {
 		mockservice := newMockService()
 		w, c := newTestContext()
-		mockservice.mockAuthService.On("DeleteSession", c).Return(ok, err)
+		mockservice.mockCacheService.On("DeleteSession", c).Return(ok, err)
 		serv := bindMockToService(mockservice)
 		serv.logout(c)
 		return w
@@ -816,47 +816,43 @@ func TestLogout(t *testing.T) {
 	}
 }
 
-func (s *mockAuthService) InitializeCache() {
+func (s *mockCacheService) InitializeCache() {
 
 }
 
-func (s *mockAuthService) CheckCookie(c *gin.Context, toBeChecked, userId string) bool {
+func (s *mockCacheService) CheckCookie(c *gin.Context, toBeChecked, userId string) bool {
 	return false
 }
 
-func (s *mockAuthService) CreateSession(username string, c *gin.Context) {
+func (s *mockCacheService) CreateSession(username string, c *gin.Context) {
 
 }
 
-func (s *mockAuthService) CheckSession(c *gin.Context) bool {
+func (s *mockCacheService) CheckSession(c *gin.Context) bool {
 	args := s.Called(c)
 	return args.Bool(0)
 
 }
 
-func (s *mockAuthService) DeleteSession(c *gin.Context) (bool, error) {
+func (s *mockCacheService) DeleteSession(c *gin.Context) (bool, error) {
 	args := s.Called(c)
 	return args.Bool(0), args.Error(1)
 }
 
-func (s *mockAuthService) CheckAdminForLoggedIn(c *gin.Context, username string) bool {
+func (s *mockCacheService) CheckAdminForLoggedIn(c *gin.Context, username string) bool {
 
 	args := s.Called(c, username)
 	return args.Bool(0)
 }
 
-func (s *mockAuthService) CloseCacheConnection() {
+func (s *mockCacheService) CloseCacheConnection() {
 }
 
-func (s *mockDBService) InitializeDB() {
-
-}
-
-func (s *mockDBService) CloseDB() {
+func (s *mockRepoService) CloseDB() {
 
 }
 
-func (s *mockDBService) GetThisMovieFromDB(c *gin.Context, id string) (*model.Movie, error) {
+func (s *mockRepoService) GetThisMovieFromDB(c *gin.Context, id string) (*model.Movie, error) {
 
 	args := s.Called(c, id)
 	if args.Get(0) == nil {
@@ -865,7 +861,7 @@ func (s *mockDBService) GetThisMovieFromDB(c *gin.Context, id string) (*model.Mo
 	return args.Get(0).(*model.Movie), args.Error(1)
 }
 
-func (s *mockDBService) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series, *[]model.Seasons, error) {
+func (s *mockRepoService) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series, *[]model.Seasons, error) {
 	args := s.Called(c, id)
 	var ret1 *model.Series
 	var ret2 *[]model.Seasons
@@ -882,11 +878,11 @@ func (s *mockDBService) GetThisSeriesFromDB(c *gin.Context, id string) (*model.S
 	return ret1, ret2, args.Error(2)
 }
 
-func (s *mockDBService) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN string) (*[]model.Episodes, error) {
+func (s *mockRepoService) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN string) (*[]model.Episodes, error) {
 	return nil, nil
 }
 
-func (s *mockDBService) GetMoviesListWithPage(c *gin.Context, page, items int) (*[]model.Movie, error) {
+func (s *mockRepoService) GetMoviesListWithPage(c *gin.Context, page, items int) (*[]model.Movie, error) {
 	args := s.Called(c, page, items)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -894,11 +890,11 @@ func (s *mockDBService) GetMoviesListWithPage(c *gin.Context, page, items int) (
 	return args.Get(0).(*[]model.Movie), args.Error(1)
 }
 
-func (s *mockDBService) GetSeriesListWithPage(c *gin.Context, page, items int) (*[]model.Series, error) {
+func (s *mockRepoService) GetSeriesListWithPage(c *gin.Context, page, items int) (*[]model.Series, error) {
 	return nil, nil
 }
 
-func (s *mockDBService) SearchContent(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) SearchContent(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	genres = []string{}
 	args := s.Called(c, name, genres, page, items)
 
@@ -909,71 +905,71 @@ func (s *mockDBService) SearchContent(c *gin.Context, name string, genres []stri
 	return args.Get(0).(*[]model.Movie), args.Get(1).(*[]model.Series), args.Error(2)
 }
 
-func (s *mockDBService) FindSimilarContent(c *gin.Context, id, cType string) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) FindSimilarContent(c *gin.Context, id, cType string) (*[]model.Movie, *[]model.Series, error) {
 	return nil, nil, nil
 }
 
-func (s *mockDBService) AddContentToFavorites(c *gin.Context, IMDB, cType string) error {
+func (s *mockRepoService) AddContentToFavorites(c *gin.Context, IMDB, cType string) error {
 
 	args := s.Called(c, "", "")
 	return args.Error(0)
 }
 
-func (s *mockDBService) GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	return nil, nil, nil
 }
 
-func (s *mockDBService) SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	return nil, nil, nil
 }
 
-func (s *mockDBService) QueryLogin(c *gin.Context, username string) (string, error) {
+func (s *mockRepoService) QueryLogin(c *gin.Context, username string) (string, error) {
 	args := s.Called(c, username)
 	return args.String(0), args.Error(1)
 }
 
-func (s *mockDBService) CreateNewUser(c *gin.Context, newUser *model.User) error {
+func (s *mockRepoService) CreateNewUser(c *gin.Context, newUser *model.User) error {
 	newUser = new(model.User)
 	args := s.Called(c, newUser)
 	return args.Error(0)
 
 }
 
-func (s *mockDBService) UpdateLastLogin(c *gin.Context, lastLoginTime time.Time, logUsername string) error {
+func (s *mockRepoService) UpdateLastLogin(c *gin.Context, lastLoginTime time.Time, logUsername string) error {
 	lastLoginTime = lastLoginTime.Truncate(time.Minute)
 	args := s.Called(c, lastLoginTime, logUsername)
 	return args.Error(0)
 }
 
-func (s *mockDBService) UpdateUserInfo(c *gin.Context, firstname, lastname, username string) error {
+func (s *mockRepoService) UpdateUserInfo(c *gin.Context, firstname, lastname, username string) error {
 	return nil
 }
 
-func (s *mockDBService) QueryUserInfo(c *gin.Context, username string) (*model.User, error) {
+func (s *mockRepoService) QueryUserInfo(c *gin.Context, username string) (*model.User, error) {
 	return nil, nil
 }
 
-func (s *mockDBService) AddMovieContentWithID(imdb string) {
+func (s *mockRepoService) AddMovieContentWithID(imdb string) {
 
 }
 
-func (s *mockDBService) AddSeriesContentWithID(imdb string) {
+func (s *mockRepoService) AddSeriesContentWithID(imdb string) {
 
 }
 
-func (s *mockDBService) AddMovieContentWithStruct(ctx context.Context, movie *model.Movie) error {
+func (s *mockRepoService) AddMovieContentWithStruct(ctx context.Context, movie *model.Movie) error {
 	movie = new(model.Movie)
 	args := s.Called(ctx, movie)
 	return args.Error(0)
 }
 
-func (s *mockDBService) AddSeriesContentWithStruct(ctx context.Context, series *model.Series) error {
+func (s *mockRepoService) AddSeriesContentWithStruct(ctx context.Context, series *model.Series) error {
 	series = new(model.Series)
 	args := s.Called(ctx, series)
 	return args.Error(0)
 }
 
-func (s *mockDBService) DeleteContent(c *gin.Context, id, contentType string) error {
+func (s *mockRepoService) DeleteContent(c *gin.Context, id, contentType string) error {
 	return nil
 }
 

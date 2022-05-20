@@ -19,17 +19,16 @@ type authImp struct {
 	client *redis.Client
 }
 
-type AuthServer interface {
+type Cache interface {
 	CheckCookie(c *gin.Context, toBeChecked, userId string) bool
 	CreateSession(username string, c *gin.Context)
 	CheckSession(c *gin.Context) bool
 	DeleteSession(c *gin.Context) (bool, error)
 	CheckAdminForLoggedIn(c *gin.Context, username string) bool
 	CloseCacheConnection()
-	InitializeCache()
 }
 
-func (chc *authImp) InitializeCache() {
+func (chc *authImp) initializeCache() {
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     redis_Host + redis_Port,
@@ -56,6 +55,12 @@ func (chc *authImp) CloseCacheConnection() {
 	}
 }
 
-func NewAuthServer() *authImp {
+func NewCache() *authImp {
+	client := &authImp{}
+	client.initializeCache()
+	return client
+}
+
+func NewTestCache() *authImp {
 	return &authImp{}
 }
