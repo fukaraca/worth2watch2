@@ -7,7 +7,7 @@ import (
 	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4/pgxpool"
-	context2 "golang.org/x/net/context"
+
 	"log"
 	"os"
 	"strings"
@@ -15,15 +15,18 @@ import (
 )
 
 var (
-	conn        *pgxpool.Pool
-	db_Host     = config.GetEnv.GetString("DB_HOST")
-	db_Port     = config.GetEnv.GetString("DB_PORT")
-	db_Name     = config.GetEnv.GetString("DB_NAME")
-	db_User     = config.GetEnv.GetString("DB_USER")
-	db_Password = config.GetEnv.GetString("DB_PASSWORD")
+	conn                *pgxpool.Pool
+	db_Host             = config.GetEnv.GetString("DB_HOST")
+	db_Port             = config.GetEnv.GetString("DB_PORT")
+	db_Name             = config.GetEnv.GetString("DB_NAME")
+	db_User             = config.GetEnv.GetString("DB_USER")
+	db_Password         = config.GetEnv.GetString("DB_PASSWORD")
+	db_InitSQL_Location = config.GetEnv.GetString("INIT_SQL_LOC")
 )
 
-type dbImp struct{}
+type dbImp struct {
+	conn *pgxpool.Pool
+}
 
 type Repository interface {
 	GetThisMovieFromDB(c *gin.Context, id string) (*model.Movie, error)
@@ -43,16 +46,16 @@ type Repository interface {
 	QueryUserInfo(c *gin.Context, username string) (*model.User, error)
 	AddMovieContentWithID(imdb string)
 	AddSeriesContentWithID(imdb string)
-	AddMovieContentWithStruct(ctx context2.Context, movie *model.Movie) error
-	AddSeriesContentWithStruct(ctx context2.Context, series *model.Series) error
+	AddMovieContentWithStruct(ctx context.Context, movie *model.Movie) error
+	AddSeriesContentWithStruct(ctx context.Context, series *model.Series) error
 	DeleteContent(c *gin.Context, id, contentType string) error
 	CloseDB()
 }
 
 //InitializeDB function creates a connection pool to PSQL DBService.
-func (dbi *dbImp) initializeDB() {
+func (dbi *dbImp) initializeDB(host, port, user, password, name string) {
 
-	databaseURL := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", db_Host, db_Port, db_User, db_Password, db_Name)
+	databaseURL := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, name)
 	pool, err := pgxpool.Connect(context.Background(), databaseURL)
 	if err != nil {
 		log.Fatalln("DB connection error:", err)
@@ -64,21 +67,22 @@ func (dbi *dbImp) initializeDB() {
 	}
 
 	conn = pool
+	dbi.conn = pool
 }
 
 func (dbi *dbImp) CloseDB() {
-	conn.Close()
+	dbi.conn.Close()
 }
 
 //CheckIfInitialized functions checks existance of tables and creates if necessary.
-func (dbi *dbImp) checkIfInitialized() {
-	sqlScript, err := os.ReadFile("./db/init.sql")
+func (dbi *dbImp) checkIfInitialized(initSQL string) {
+	sqlScript, err := os.ReadFile(initSQL)
 	if err != nil {
 		log.Fatalln("init.sql file couldn't be read: ", err)
 	}
 	statements := strings.Split(string(sqlScript), ";\n")
 	for _, statement := range statements {
-		comm, err := conn.Exec(context.Background(), statement)
+		comm, err := dbi.conn.Exec(context.Background(), statement)
 		if err != nil {
 			log.Println("checked for initial DB structure : ", err, comm.String())
 		}
@@ -88,7 +92,14 @@ func (dbi *dbImp) checkIfInitialized() {
 
 func NewRepository() *dbImp {
 	database := &dbImp{}
-	database.initializeDB()
-	database.checkIfInitialized()
+	database.initializeDB(db_Host, db_Port, db_User, db_Password, db_Name)
+	database.checkIfInitialized(db_InitSQL_Location)
+	return database
+}
+
+func NewTestDB(host, port, user, password, name, initSQL string) *dbImp {
+	database := &dbImp{}
+	database.initializeDB(host, port, user, password, name)
+	database.checkIfInitialized(initSQL)
 	return database
 }

@@ -41,7 +41,6 @@ func (chc *authImp) CreateSession(username string, c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-
 	if ok, err := db.IsAdmin(c, username); ok && err == nil {
 		chc.client.Do(ctx, "SETEX", "admin-"+username, "3600", true)
 	}

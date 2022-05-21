@@ -8,13 +8,14 @@ import (
 	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid"
+	"github.com/jackc/pgtype"
 	"net/url"
 	"strings"
 
+	"context"
 	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"io/ioutil"
 	"net/http"
@@ -204,6 +205,184 @@ func TestCheckRegistration(t *testing.T) {
 	mock.AssertExpectationsForObjects(t)
 }
 
+func TestGetMoviesWithPage(t *testing.T) {
+	fn := func(pageK, itemsK, pageV, itemsV string, pageInt, ItemsInt int, retErr error, retMov *[]model.Movie) *httptest.ResponseRecorder {
+		mockservice := newMockService()
+		w, c := newTestContext()
+		v := url.Values{}
+		v.Add(pageK, pageV)
+		v.Add(itemsK, itemsV)
+		req, _ := http.NewRequest("GET", "/movies/list", nil)
+		req.URL.RawQuery = v.Encode()
+		c.Request = req
+		mockservice.mockRepoService.On("GetMoviesListWithPage", c, pageInt, ItemsInt).Return(retMov, retErr)
+		serv := bindMockToService(mockservice)
+		serv.getMoviesWithPage(c)
+		return w
+	}
+	tests := []struct {
+		pK, pV, iK, iV, name string
+		pI, iI               int
+		rE                   error
+		rM                   *[]model.Movie
+		expected             int
+		msg                  string
+	}{
+		{
+			name:     "case for successfully created",
+			pK:       "page",
+			pV:       "1",
+			iK:       "items",
+			iV:       "10",
+			pI:       1,
+			iI:       10,
+			rE:       nil,
+			rM:       new([]model.Movie),
+			expected: http.StatusOK,
+			msg:      "it's supposed to get status ok",
+		},
+		{
+			name:     "case for invalid page value",
+			pK:       "page",
+			pV:       "1e",
+			iK:       "items",
+			iV:       "10",
+			pI:       1,
+			iI:       10,
+			rE:       nil,
+			rM:       new([]model.Movie),
+			expected: http.StatusBadRequest,
+			msg:      "it's supposed to get bad request for invalid page format",
+		},
+		{
+			name:     "case for invalid items value",
+			pK:       "page",
+			pV:       "1",
+			iK:       "items",
+			iV:       "1f0",
+			pI:       1,
+			iI:       10,
+			rE:       nil,
+			rM:       new([]model.Movie),
+			expected: http.StatusBadRequest,
+			msg:      "it's supposed to get bad request for invalid items format",
+		},
+		{
+			name:     "case for internal serv error",
+			pK:       "page",
+			pV:       "1",
+			iK:       "items",
+			iV:       "10",
+			pI:       1,
+			iI:       10,
+			rE:       errors.New("FAIL"),
+			rM:       nil,
+			expected: http.StatusInternalServerError,
+			msg:      "it's supposed to get internal server error",
+		},
+		{
+			name:     "case for end of list or no movie ",
+			pK:       "page",
+			pV:       "1",
+			iK:       "items",
+			iV:       "10",
+			pI:       1,
+			iI:       10,
+			rE:       pgx.ErrNoRows,
+			rM:       nil,
+			expected: http.StatusOK,
+			msg:      "it's supposed to get end of list err",
+		},
+	}
+
+	for _, test := range tests {
+		w := fn(test.pK, test.iK, test.pV, test.iV, test.pI, test.iI, test.rE, test.rM)
+		assert.Equal(t, test.expected, w.Code, test.msg+" for "+test.name)
+
+	}
+
+}
+
+func TestAddToFavorites(t *testing.T) {
+
+	fn := func(form url.Values, status int, expected, expected_msg string, ret error) {
+		mockservice := newMockService()
+		w, c := newTestContext()
+		requ, _ := http.NewRequest("POST", "/favorites", strings.NewReader(form.Encode()))
+		requ.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		c.Request = requ
+		mockservice.mockRepoService.On("AddContentToFavorites", c, "", "").Return(ret)
+		serv := bindMockToService(mockservice)
+		serv.addToFavorites(c)
+		assert.Equal(t, status, w.Code)
+		r, _ := ioutil.ReadAll(w.Body)
+		assert.Equal(t, expected, string(r), expected_msg)
+
+	}
+	tt := []struct {
+		name                   string
+		urls                   url.Values
+		status                 int
+		expected, expected_msg string
+		ret                    error
+	}{
+		{
+			name: "case for successful creation",
+			urls: url.Values{
+				"imdb-id":      []string{"tt0111161"},
+				"content-type": []string{"movie"}},
+			status:       http.StatusCreated,
+			expected:     "{\"notification\":\"content has been added successfully\"}",
+			expected_msg: "it's supposed to get succesful creation",
+			ret:          nil,
+		},
+		{
+			name: "case for successful creation",
+			urls: url.Values{
+				"imdb-id":      []string{"tt0111162"},
+				"content-type": []string{"series"}},
+			status:       http.StatusCreated,
+			expected:     "{\"notification\":\"content has been added successfully\"}",
+			expected_msg: "it's supposed to get succesful creation",
+			ret:          nil,
+		},
+		{
+			name: "case for missing id",
+			urls: url.Values{
+				"imdb-id":      []string{""},
+				"content-type": []string{"movie"}},
+			status:       http.StatusBadRequest,
+			expected:     "{\"notification\":\"missing imdb-id\"}",
+			expected_msg: "it's supposed to get missing imdb-id error",
+			ret:          nil,
+		},
+		{
+			name: "case for invalid content type",
+			urls: url.Values{
+				"imdb-id":      []string{"tt0111162"},
+				"content-type": []string{""}},
+			status:       http.StatusBadRequest,
+			expected:     "{\"notification\":\"invalid content-type: \"}",
+			ret:          nil,
+			expected_msg: "it's supposed to get missing content-type error",
+		},
+		{
+			name: "case for insertion failure",
+			urls: url.Values{
+				"imdb-id":      []string{"tt0111162"},
+				"content-type": []string{"movie"}},
+			status:       http.StatusInternalServerError,
+			expected:     "{\"notification\":\"FAIL\"}",
+			ret:          errors.New("FAIL"),
+			expected_msg: "it's supposed to be gotten insertion error",
+		},
+	}
+	for _, t := range tt {
+		fn(t.urls, t.status, t.expected, t.expected_msg, t.ret)
+	}
+
+}
+
 func TestLogin(t *testing.T) {
 	mockservice := newMockService()
 	//////////////first successful login
@@ -323,104 +502,6 @@ func TestGetThisMovie(t *testing.T) {
 
 }
 
-func TestGetMoviesWithPage(t *testing.T) {
-	fn := func(pageK, itemsK, pageV, itemsV string, pageInt, ItemsInt int, retErr error, retMov *[]model.Movie) *httptest.ResponseRecorder {
-		mockservice := newMockService()
-		w, c := newTestContext()
-		v := url.Values{}
-		v.Add(pageK, pageV)
-		v.Add(itemsK, itemsV)
-		req, _ := http.NewRequest("GET", "/movies/list", nil)
-		req.URL.RawQuery = v.Encode()
-		c.Request = req
-		mockservice.mockRepoService.On("GetMoviesListWithPage", c, pageInt, ItemsInt).Return(retMov, retErr)
-		serv := bindMockToService(mockservice)
-		serv.getMoviesWithPage(c)
-		return w
-	}
-	tests := []struct {
-		pK, pV, iK, iV, name string
-		pI, iI               int
-		rE                   error
-		rM                   *[]model.Movie
-		expected             int
-		msg                  string
-	}{
-		{
-			name:     "case for successfully created",
-			pK:       "page",
-			pV:       "1",
-			iK:       "items",
-			iV:       "10",
-			pI:       1,
-			iI:       10,
-			rE:       nil,
-			rM:       new([]model.Movie),
-			expected: http.StatusOK,
-			msg:      "it's supposed to get status ok",
-		},
-		{
-			name:     "case for invalid page value",
-			pK:       "page",
-			pV:       "1e",
-			iK:       "items",
-			iV:       "10",
-			pI:       1,
-			iI:       10,
-			rE:       nil,
-			rM:       new([]model.Movie),
-			expected: http.StatusBadRequest,
-			msg:      "it's supposed to get bad request for invalid page format",
-		},
-		{
-			name:     "case for invalid items value",
-			pK:       "page",
-			pV:       "1",
-			iK:       "items",
-			iV:       "1f0",
-			pI:       1,
-			iI:       10,
-			rE:       nil,
-			rM:       new([]model.Movie),
-			expected: http.StatusBadRequest,
-			msg:      "it's supposed to get bad request for invalid items format",
-		},
-		{
-			name:     "case for internal serv error",
-			pK:       "page",
-			pV:       "1",
-			iK:       "items",
-			iV:       "10",
-			pI:       1,
-			iI:       10,
-			rE:       errors.New("FAIL"),
-			rM:       nil,
-			expected: http.StatusInternalServerError,
-			msg:      "it's supposed to get internal server error",
-		},
-		{
-			name:     "case for end of list or no movie ",
-			pK:       "page",
-			pV:       "1",
-			iK:       "items",
-			iV:       "10",
-			pI:       1,
-			iI:       10,
-			rE:       pgx.ErrNoRows,
-			rM:       nil,
-			expected: http.StatusOK,
-			msg:      "it's supposed to get end of list err",
-		},
-	}
-
-	for _, test := range tests {
-		w := fn(test.pK, test.iK, test.pV, test.iV, test.pI, test.iI, test.rE, test.rM)
-		assert.Equal(t, test.expected, w.Code, test.msg+" for "+test.name)
-
-	}
-
-}
-
 func TestAddContentWithJSON(t *testing.T) {
 	mockservice := newMockService()
 	w, c := newTestContext()
@@ -467,86 +548,6 @@ func TestAddContentWithJSON(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	r, _ = ioutil.ReadAll(w.Body)
 	assert.Equal(t, "{\"notification\":\"content has been created successfully\"}", string(r), "it's supposed to be: content has been created successfully")
-
-}
-
-func TestAddToFavorites(t *testing.T) {
-
-	fn := func(form url.Values, status int, expected, expected_msg string, ret error) {
-		mockservice := newMockService()
-		w, c := newTestContext()
-		requ, _ := http.NewRequest("POST", "/favorites", strings.NewReader(form.Encode()))
-		requ.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		c.Request = requ
-		mockservice.mockRepoService.On("AddContentToFavorites", c, "", "").Return(ret)
-		serv := bindMockToService(mockservice)
-		serv.addToFavorites(c)
-		assert.Equal(t, status, w.Code)
-		r, _ := ioutil.ReadAll(w.Body)
-		assert.Equal(t, expected, string(r), expected_msg)
-
-	}
-	tt := []struct {
-		name                   string
-		urls                   url.Values
-		status                 int
-		expected, expected_msg string
-		ret                    error
-	}{
-		{
-			name: "case for successful creation",
-			urls: url.Values{
-				"imdb-id":      []string{"tt0111161"},
-				"content-type": []string{"movie"}},
-			status:       http.StatusCreated,
-			expected:     "{\"notification\":\"content has been added successfully\"}",
-			expected_msg: "it's supposed to get succesful creation",
-			ret:          nil,
-		},
-		{
-			name: "case for successful creation",
-			urls: url.Values{
-				"imdb-id":      []string{"tt0111162"},
-				"content-type": []string{"series"}},
-			status:       http.StatusCreated,
-			expected:     "{\"notification\":\"content has been added successfully\"}",
-			expected_msg: "it's supposed to get succesful creation",
-			ret:          nil,
-		},
-		{
-			name: "case for missing id",
-			urls: url.Values{
-				"imdb-id":      []string{""},
-				"content-type": []string{"movie"}},
-			status:       http.StatusBadRequest,
-			expected:     "{\"notification\":\"missing imdb-id\"}",
-			expected_msg: "it's supposed to get missing imdb-id error",
-			ret:          nil,
-		},
-		{
-			name: "case for invalid content type",
-			urls: url.Values{
-				"imdb-id":      []string{"tt0111162"},
-				"content-type": []string{""}},
-			status:       http.StatusBadRequest,
-			expected:     "{\"notification\":\"invalid content-type: \"}",
-			ret:          nil,
-			expected_msg: "it's supposed to get missing content-type error",
-		},
-		{
-			name: "case for insertion failure",
-			urls: url.Values{
-				"imdb-id":      []string{"tt0111162"},
-				"content-type": []string{"movie"}},
-			status:       http.StatusInternalServerError,
-			expected:     "{\"notification\":\"FAIL\"}",
-			ret:          errors.New("FAIL"),
-			expected_msg: "it's supposed to be gotten insertion error",
-		},
-	}
-	for _, t := range tt {
-		fn(t.urls, t.status, t.expected, t.expected_msg, t.ret)
-	}
 
 }
 
@@ -733,7 +734,7 @@ func TestGetThisSeries(t *testing.T) {
 			name:      "case for no season for that series",
 			idK:       "seriesid",
 			idV:       "1",
-			series:    new(model.Series),
+			series:    &model.Series{ReleaseDate: pgtype.Date{Status: 1}},
 			seasons:   nil,
 			err:       errors.New("there is no season for given series"),
 			expStatus: http.StatusOK,
@@ -755,7 +756,7 @@ func TestGetThisSeries(t *testing.T) {
 			name:      "case for successful response",
 			idK:       "seriesid",
 			idV:       "1",
-			series:    new(model.Series),
+			series:    &model.Series{ReleaseDate: pgtype.Date{Status: 1}},
 			seasons:   new([]model.Seasons),
 			err:       nil,
 			expStatus: http.StatusOK,
@@ -897,12 +898,21 @@ func (s *mockRepoService) GetSeriesListWithPage(c *gin.Context, page, items int)
 func (s *mockRepoService) SearchContent(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	genres = []string{}
 	args := s.Called(c, name, genres, page, items)
-
-	//cases for unary null is neglected
-	if args.Get(0) == nil && args.Get(1) == nil {
-		return nil, nil, args.Error(2)
+	var ret0 *[]model.Movie
+	var ret1 *[]model.Series
+	if args.Get(0) == nil {
+		ret0 = nil
+	} else {
+		ret0 = args.Get(0).(*[]model.Movie)
 	}
-	return args.Get(0).(*[]model.Movie), args.Get(1).(*[]model.Series), args.Error(2)
+
+	if args.Get(1) == nil {
+		ret1 = nil
+	} else {
+		ret1 = args.Get(1).(*[]model.Series)
+	}
+
+	return ret0, ret1, args.Error(2)
 }
 
 func (s *mockRepoService) FindSimilarContent(c *gin.Context, id, cType string) (*[]model.Movie, *[]model.Series, error) {

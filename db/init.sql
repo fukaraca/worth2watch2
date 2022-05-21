@@ -1,9 +1,8 @@
--- noinspection SqlCurrentSchemaInspectionForFile
 
 CREATE TABLE IF NOT EXISTS users (
     user_id serial primary key not null ,
     username varchar(50) not null unique ,
-    password char(64) not null ,
+    password varchar(64) not null ,
     email varchar(255) not null unique ,
     name varchar(50),
     lastname varchar(50),

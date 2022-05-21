@@ -1,9 +1,9 @@
 package db
 
 import (
+	"context"
 	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
 	"log"
 )
 
@@ -14,13 +14,13 @@ func (dbi *dbImp) AddContentToFavorites(c *gin.Context, IMDB, cType string) erro
 	username, _ := c.Cookie("uid")
 
 	if cType == "movie" {
-		_, err := conn.Exec(ctx, "INSERT INTO favorite_movies (favorite_id, user_id, movie_id) VALUES (nextval('favorite_movies_favorite_id_seq'),(SELECT user_id FROM users WHERE username=$1),(SELECT movie_id FROM movies WHERE imdb_id=$2));", username, IMDB)
+		_, err := dbi.conn.Exec(ctx, "INSERT INTO favorite_movies (favorite_id, user_id, movie_id) VALUES (nextval('favorite_movies_favorite_id_seq'),(SELECT user_id FROM users WHERE username=$1),(SELECT movie_id FROM movies WHERE imdb_id=$2));", username, IMDB)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
-	_, err := conn.Exec(ctx, "INSERT INTO favorite_series (favorite_id, user_id, serie_id) VALUES (nextval('favorite_series_favorite_id_seq'),(SELECT user_id FROM users WHERE username=$1),(SELECT serie_id FROM series WHERE imdb_id=$2));", username, IMDB)
+	_, err := dbi.conn.Exec(ctx, "INSERT INTO favorite_series (favorite_id, user_id, serie_id) VALUES (nextval('favorite_series_favorite_id_seq'),(SELECT user_id FROM users WHERE username=$1),(SELECT serie_id FROM series WHERE imdb_id=$2));", username, IMDB)
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (dbi *dbImp) GetFavoriteContents(c *gin.Context, page, items int) (*[]model
 	offset := (page - 1) * items
 	username, _ := c.Cookie("uid")
 
-	rows, err := conn.Query(ctx, "SELECT title,description,rating,release_date,imdb_id,genres FROM movies LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id WHERE user_id=(SELECT user_id FROM users WHERE username=$1) ORDER BY movies.movie_id DESC OFFSET $2 LIMIT $3;", username, offset, items)
+	rows, err := dbi.conn.Query(ctx, "SELECT title,description,rating,release_date,imdb_id,genres FROM movies LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id WHERE user_id=(SELECT user_id FROM users WHERE username=$1) ORDER BY movies.movie_id DESC OFFSET $2 LIMIT $3;", username, offset, items)
 	defer rows.Close()
 	tempMovies := []model.Movie{}
 	if err != nil {
@@ -53,7 +53,7 @@ func (dbi *dbImp) GetFavoriteContents(c *gin.Context, page, items int) (*[]model
 	}
 serieLabel3:
 	//then search for series
-	rows, err = conn.Query(ctx, "SELECT title,description,rating,release_date,imdb_id,genres FROM series LEFT JOIN favorite_series ON series.serie_id = favorite_series.serie_id WHERE user_id=(SELECT user_id FROM users WHERE username=$1) ORDER BY series.serie_id DESC OFFSET $2 LIMIT $3;", username, offset, items)
+	rows, err = dbi.conn.Query(ctx, "SELECT title,description,rating,release_date,imdb_id,genres FROM series LEFT JOIN favorite_series ON series.serie_id = favorite_series.serie_id WHERE user_id=(SELECT user_id FROM users WHERE username=$1) ORDER BY series.serie_id DESC OFFSET $2 LIMIT $3;", username, offset, items)
 	defer rows.Close()
 	tempSeries := []model.Series{}
 	if err != nil {
@@ -84,7 +84,7 @@ func (dbi *dbImp) SearchFavorites(c *gin.Context, name string, genres []string, 
 	if name != "" && len(genres) > 0 {
 		//both name and genres are requested (OR Conditional)
 		//first search for movie
-		rows, err := conn.Query(ctx, `
+		rows, err := dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM movies
     LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ
@@ -108,7 +108,7 @@ WHERE title ~* $2 OR SQ.genres && $3 ORDER BY rating DESC OFFSET $4 LIMIT $5;
 		}
 	seriesLabel1:
 		//then search for series
-		rows, err = conn.Query(ctx, `
+		rows, err = dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM series
     LEFT JOIN favorite_series ON series.serie_id = favorite_series.serie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ
@@ -135,7 +135,7 @@ WHERE title ~* $2 OR SQ.genres && $3 ORDER BY rating DESC OFFSET $4 LIMIT $5;
 	} else if name == "" && len(genres) > 0 {
 		//search only for genres
 		//first search for movie
-		rows, err := conn.Query(ctx, `
+		rows, err := dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM movies
     LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ
@@ -160,7 +160,7 @@ WHERE SQ.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;
 		}
 	seriesLabel2:
 		//then search for series
-		rows, err = conn.Query(ctx, `
+		rows, err = dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM series
     LEFT JOIN favorite_series ON series.serie_id = favorite_series.serie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ
@@ -188,7 +188,7 @@ WHERE SQ.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;
 	} else if name != "" && len(genres) == 0 {
 		//search only with name
 		//first search for movie
-		rows, err := conn.Query(ctx, `
+		rows, err := dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM movies
     LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ
@@ -212,7 +212,7 @@ WHERE title ~* $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;
 		}
 	serieLabel3:
 		//then search for series
-		rows, err = conn.Query(ctx, `
+		rows, err = dbi.conn.Query(ctx, `
 SELECT * FROM (SELECT title,description,rating,release_date,imdb_id,genres FROM series
     LEFT JOIN favorite_series ON series.serie_id = favorite_series.serie_id
 WHERE user_id=(SELECT user_id FROM users WHERE username=$1)) AS SQ

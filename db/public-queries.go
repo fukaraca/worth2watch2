@@ -1,12 +1,12 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"github.com/fukaraca/worth2watch2/model"
 	"github.com/fukaraca/worth2watch2/util"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4"
-	"golang.org/x/net/context"
 	"log"
 	"strconv"
 )
@@ -15,7 +15,7 @@ import (
 func (dbi *dbImp) GetThisMovieFromDB(c *gin.Context, id string) (*model.Movie, error) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-	row := conn.QueryRow(ctx, "SELECT * FROM movies WHERE imdb_id=$1", id)
+	row := dbi.conn.QueryRow(ctx, "SELECT * FROM movies WHERE imdb_id=$1", id)
 	temp := new(model.Movie)
 
 	err := row.Scan(&temp.MovieID, &temp.Title, &temp.Description, &temp.Rating, &temp.ReleaseDate, &temp.Directors, &temp.Writers, &temp.Stars, &temp.Duration, &temp.IMDBid, &temp.Year, &temp.Genres, &temp.Audios, &temp.Subtitles)
@@ -32,7 +32,7 @@ func (dbi *dbImp) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series,
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	//get series
-	row := conn.QueryRow(ctx, "SELECT * FROM series WHERE imdb_id=$1", id)
+	row := dbi.conn.QueryRow(ctx, "SELECT * FROM series WHERE imdb_id=$1", id)
 	tempSeries := new(model.Series)
 
 	err := row.Scan(&tempSeries.SerieID, &tempSeries.Title, &tempSeries.Description, &tempSeries.Rating, &tempSeries.ReleaseDate, &tempSeries.Directors, &tempSeries.Writers, &tempSeries.Stars, &tempSeries.Duration, &tempSeries.IMDBid, &tempSeries.Year, &tempSeries.Genres, &tempSeries.Seasons)
@@ -41,7 +41,7 @@ func (dbi *dbImp) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series,
 		return nil, nil, err
 	}
 	//get seasons
-	rows, err := conn.Query(ctx, "SELECT * FROM seasons WHERE imdb_id=$1", id)
+	rows, err := dbi.conn.Query(ctx, "SELECT * FROM seasons WHERE imdb_id=$1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return tempSeries, nil, fmt.Errorf("there is no season for given series")
@@ -76,14 +76,14 @@ func (dbi *dbImp) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN strin
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 
-	row := conn.QueryRow(ctx, "SELECT season_id FROM seasons WHERE imdb_id=$1 AND season_number=$2", seriesID, seasonNumber)
+	row := dbi.conn.QueryRow(ctx, "SELECT season_id FROM seasons WHERE imdb_id=$1 AND season_number=$2", seriesID, seasonNumber)
 	var seasonID int
 	err = row.Scan(&seasonID)
 	if err != nil {
 		log.Println("season id couldn't be get from db", err)
 		return nil, err
 	}
-	rows, err := conn.Query(ctx, "SELECT * FROM episodes WHERE season_id=$1", seasonID)
+	rows, err := dbi.conn.Query(ctx, "SELECT * FROM episodes WHERE season_id=$1", seasonID)
 	defer rows.Close()
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (dbi *dbImp) GetMoviesListWithPage(c *gin.Context, page, items int) (*[]mod
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	offset := (page - 1) * items
-	rows, err := conn.Query(ctx, "SELECT * FROM movies ORDER BY rating DESC OFFSET $1 LIMIT $2;", offset, items)
+	rows, err := dbi.conn.Query(ctx, "SELECT * FROM movies ORDER BY rating DESC OFFSET $1 LIMIT $2;", offset, items)
 	defer rows.Close()
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (dbi *dbImp) GetSeriesListWithPage(c *gin.Context, page, items int) (*[]mod
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	offset := (page - 1) * items
-	rows, err := conn.Query(ctx, "SELECT * FROM series ORDER BY rating DESC OFFSET $1 LIMIT $2;", offset, items)
+	rows, err := dbi.conn.Query(ctx, "SELECT * FROM series ORDER BY rating DESC OFFSET $1 LIMIT $2;", offset, items)
 	defer rows.Close()
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 	if name != "" && len(genres) > 0 {
 		//both name and genres are requested (OR Conditional)
 		//first search for movie
-		rows, err := conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE title ~* $1 OR movies.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4 ;", name, genres, offset, items)
+		rows, err := dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE title ~* $1 OR movies.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4 ;", name, genres, offset, items)
 		defer rows.Close()
 		tempMovies := []model.Movie{}
 		if err != nil {
@@ -179,7 +179,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 		}
 	seriesLabel1:
 		//then search for series
-		rows, err = conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE title ~* $1 OR series.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;", name, genres, offset, items)
+		rows, err = dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE title ~* $1 OR series.genres && $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;", name, genres, offset, items)
 		defer rows.Close()
 		tempSeries := []model.Series{}
 		if err != nil {
@@ -201,7 +201,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 	} else if name == "" && len(genres) > 0 {
 		//search only for genres
 		//first search for movie
-		rows, err := conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE genres && $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", genres, offset, items)
+		rows, err := dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE genres && $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", genres, offset, items)
 		defer rows.Close()
 		tempMovies := []model.Movie{}
 		if err != nil {
@@ -221,7 +221,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 		}
 	seriesLabel2:
 		//then search for series
-		rows, err = conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE genres && $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", genres, offset, items)
+		rows, err = dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE genres && $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", genres, offset, items)
 		defer rows.Close()
 		tempSeries := []model.Series{}
 		if err != nil {
@@ -244,7 +244,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 	} else if name != "" && len(genres) == 0 {
 		//search only with name
 		//first search for movie
-		rows, err := conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE title ~* $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", name, offset, items)
+		rows, err := dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE title ~* $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", name, offset, items)
 		defer rows.Close()
 		tempMovies := []model.Movie{}
 		if err != nil {
@@ -263,7 +263,7 @@ func (dbi *dbImp) SearchContent(c *gin.Context, name string, genres []string, pa
 		}
 	serieLabel3:
 		//then search for series
-		rows, err = conn.Query(ctx, "SELECT DISTINCT title,description,rating, release_date, imdb_id,genres FROM series WHERE title ~* $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", name, offset, items)
+		rows, err = dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating, release_date, imdb_id,genres FROM series WHERE title ~* $1 ORDER BY rating DESC OFFSET $2 LIMIT $3;", name, offset, items)
 		defer rows.Close()
 		tempSeries := []model.Series{}
 		if err != nil {
@@ -299,7 +299,7 @@ func (dbi *dbImp) FindSimilarContent(c *gin.Context, id, cType string) (*[]model
 	amount := 2
 	if cType == "movie" {
 		//requested content type is series
-		rows, err := conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE genres && (SELECT genres FROM movies WHERE imdb_id=$1) AND imdb_id!=$1 ORDER BY rating DESC  LIMIT $2 ;", id, amount)
+		rows, err := dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM movies WHERE genres && (SELECT genres FROM movies WHERE imdb_id=$1) AND imdb_id!=$1 ORDER BY rating DESC  LIMIT $2 ;", id, amount)
 		defer rows.Close()
 		if err != nil {
 			return nil, nil, err
@@ -317,7 +317,7 @@ func (dbi *dbImp) FindSimilarContent(c *gin.Context, id, cType string) (*[]model
 		return &tempMovies, nil, nil
 	}
 	//requested content type is series
-	rows, err := conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE genres && (SELECT genres FROM series WHERE imdb_id=$1) AND imdb_id!=$1 ORDER BY rating DESC  LIMIT $2 ;", id, amount)
+	rows, err := dbi.conn.Query(ctx, "SELECT DISTINCT title,description,rating,release_date, imdb_id,genres FROM series WHERE genres && (SELECT genres FROM series WHERE imdb_id=$1) AND imdb_id!=$1 ORDER BY rating DESC  LIMIT $2 ;", id, amount)
 	defer rows.Close()
 	if err != nil {
 		return nil, nil, err
