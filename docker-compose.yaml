@@ -19,6 +19,18 @@ services:
       - '6379:6379'
     networks:
       - mynet
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - postgresdb
+      - rediscache
+    restart: on-failure
+    networks:
+      - mynet
+    ports:
+      - '8080:8080'
 networks:
   mynet:
     driver: bridge

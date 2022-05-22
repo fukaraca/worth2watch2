@@ -7,14 +7,15 @@ testauth:
 testutil:
 	go test -v -cover ./util
 
+#we need a running psql for test. so, use testall
+testdb:
+	go test -v -cover ./db -count=1
 
 testall:
-	make testutil testauth testapi testdb
+	make init-test-container testapi testauth testutil testdb teardown-test-container
 
-testdb:
-	go test -v -cover ./db
 
-init-test-db:
+init-test-container:
 	sudo docker-compose -f ./db/test/docker-compose.yaml up -d
 
 teardown-test-container:
