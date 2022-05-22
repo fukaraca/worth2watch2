@@ -9,7 +9,7 @@ testutil:
 
 
 testall:
-	make testutil testauth testapi
+	make testutil testauth testapi testdb
 
 testdb:
 	go test -v -cover ./db
@@ -17,7 +17,7 @@ testdb:
 init-test-db:
 	sudo docker-compose -f ./db/test/docker-compose.yaml up -d
 
-remove-test-db:
+teardown-test-container:
 	sudo docker stop $$(sudo docker ps -aq)
 	sudo docker rm $$(sudo docker ps -aq)
 

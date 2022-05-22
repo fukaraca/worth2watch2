@@ -36,9 +36,9 @@ type Repository interface {
 	GetSeriesListWithPage(c *gin.Context, page, items int) (*[]model.Series, error)
 	SearchContent(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error)
 	FindSimilarContent(c *gin.Context, id, cType string) (*[]model.Movie, *[]model.Series, error)
-	AddContentToFavorites(c *gin.Context, IMDB, cType string) error
-	GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error)
-	SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error)
+	AddContentToFavorites(c *gin.Context, IMDB, cType, username string) error
+	GetFavoriteContents(c *gin.Context, page, items int, username string) (*[]model.Movie, *[]model.Series, error)
+	SearchFavorites(c *gin.Context, name, username string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error)
 	QueryLogin(c *gin.Context, username string) (string, error)
 	CreateNewUser(c *gin.Context, newUser *model.User) error
 	UpdateLastLogin(c *gin.Context, lastLoginTime time.Time, logUsername string) error

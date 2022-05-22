@@ -43,7 +43,7 @@ func IsAdmin(c *gin.Context, username string) (bool, error) {
 	result := conn.QueryRow(ctx, "SELECT isadmin FROM users WHERE username = $1;", username)
 	err := result.Scan(&isAdmin)
 	if err != nil {
-		log.Println("login query for password failed:", err)
+
 		return false, err
 	}
 
@@ -97,7 +97,7 @@ func (dbi *dbImp) QueryUserInfo(c *gin.Context, username string) (*model.User, e
 	row := dbi.conn.QueryRow(ctx, "SELECT * FROM users WHERE username = $1;", username)
 	err := row.Scan(&tempUser.UserID, &tempUser.Username, &tempUser.Password, &tempUser.Email, &tempUser.Name, &tempUser.Lastname, &tempUser.CreatedOn, &tempUser.LastLogin, &tempUser.Isadmin)
 	if err != nil {
-		return nil, fmt.Errorf("scanning the user infos from DB was failed:%v", err)
+		return nil, err
 	}
 	tempUser.Password = ""
 	return tempUser, nil

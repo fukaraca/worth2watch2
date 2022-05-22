@@ -36,7 +36,6 @@ func (dbi *dbImp) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series,
 	tempSeries := new(model.Series)
 
 	err := row.Scan(&tempSeries.SerieID, &tempSeries.Title, &tempSeries.Description, &tempSeries.Rating, &tempSeries.ReleaseDate, &tempSeries.Directors, &tempSeries.Writers, &tempSeries.Stars, &tempSeries.Duration, &tempSeries.IMDBid, &tempSeries.Year, &tempSeries.Genres, &tempSeries.Seasons)
-	fmt.Println(tempSeries, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +68,6 @@ func (dbi *dbImp) GetThisSeriesFromDB(c *gin.Context, id string) (*model.Series,
 func (dbi *dbImp) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN string) (*[]model.Episodes, error) {
 	seasonNumber, err := strconv.Atoi(sN)
 	if err != nil {
-		log.Println("invalid season number", err)
 		return nil, err
 	}
 
@@ -80,7 +78,6 @@ func (dbi *dbImp) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN strin
 	var seasonID int
 	err = row.Scan(&seasonID)
 	if err != nil {
-		log.Println("season id couldn't be get from db", err)
 		return nil, err
 	}
 	rows, err := dbi.conn.Query(ctx, "SELECT * FROM episodes WHERE season_id=$1", seasonID)
@@ -93,7 +90,6 @@ func (dbi *dbImp) GetEpisodesForaSeasonFromDB(c *gin.Context, seriesID, sN strin
 		ep := model.Episodes{}
 		err = rows.Scan(&ep.EpisodeID, &ep.Title, &ep.Description, &ep.Rating, &ep.ReleaseDate, &ep.Directors, &ep.Writers, &ep.Stars, &ep.Duration, &ep.IMDBid, &ep.Year, &ep.Audios, &ep.Subtitles, &ep.SeasonID, &ep.EpisodeNumber)
 		if err != nil {
-			log.Printf("episode %s couldn't be get from db for serie%s\n", sN, seriesID)
 			continue
 		}
 		tempSeason = append(tempSeason, ep)

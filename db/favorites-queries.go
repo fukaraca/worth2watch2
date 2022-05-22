@@ -8,10 +8,9 @@ import (
 )
 
 //AddContentToFavorites adds related content to favorites for specific user
-func (dbi *dbImp) AddContentToFavorites(c *gin.Context, IMDB, cType string) error {
+func (dbi *dbImp) AddContentToFavorites(c *gin.Context, IMDB, cType, username string) error {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
-	username, _ := c.Cookie("uid")
 
 	if cType == "movie" {
 		_, err := dbi.conn.Exec(ctx, "INSERT INTO favorite_movies (favorite_id, user_id, movie_id) VALUES (nextval('favorite_movies_favorite_id_seq'),(SELECT user_id FROM users WHERE username=$1),(SELECT movie_id FROM movies WHERE imdb_id=$2));", username, IMDB)
@@ -28,11 +27,10 @@ func (dbi *dbImp) AddContentToFavorites(c *gin.Context, IMDB, cType string) erro
 }
 
 //GetFavoriteContents queires for favorites for certain user as per pagination code
-func (dbi *dbImp) GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (dbi *dbImp) GetFavoriteContents(c *gin.Context, page, items int, username string) (*[]model.Movie, *[]model.Series, error) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	offset := (page - 1) * items
-	username, _ := c.Cookie("uid")
 
 	rows, err := dbi.conn.Query(ctx, "SELECT title,description,rating,release_date,imdb_id,genres FROM movies LEFT JOIN favorite_movies ON movies.movie_id = favorite_movies.movie_id WHERE user_id=(SELECT user_id FROM users WHERE username=$1) ORDER BY movies.movie_id DESC OFFSET $2 LIMIT $3;", username, offset, items)
 	defer rows.Close()
@@ -75,11 +73,10 @@ returnLabel3:
 }
 
 //SearchFavorites search favorites for both movie and series with case insensitive regexp and full match with genres
-func (dbi *dbImp) SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (dbi *dbImp) SearchFavorites(c *gin.Context, name, username string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), model.TIMEOUT)
 	defer cancel()
 	offset := (page - 1) * items
-	username, _ := c.Cookie("uid")
 
 	if name != "" && len(genres) > 0 {
 		//both name and genres are requested (OR Conditional)
@@ -239,7 +236,7 @@ WHERE title ~* $2 ORDER BY rating DESC OFFSET $3 LIMIT $4;
 	}
 
 	//there is no filter. So just get lists
-	tempMovies, tempSeries, err := dbi.GetFavoriteContents(c, page, items)
+	tempMovies, tempSeries, err := dbi.GetFavoriteContents(c, page, items, username)
 	if err != nil {
 		return nil, nil, err
 	}

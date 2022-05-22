@@ -311,7 +311,7 @@ func TestAddToFavorites(t *testing.T) {
 		requ, _ := http.NewRequest("POST", "/favorites", strings.NewReader(form.Encode()))
 		requ.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		c.Request = requ
-		mockservice.mockRepoService.On("AddContentToFavorites", c, "", "").Return(ret)
+		mockservice.mockRepoService.On("AddContentToFavorites", c, "", "", "").Return(ret)
 		serv := bindMockToService(mockservice)
 		serv.addToFavorites(c)
 		assert.Equal(t, status, w.Code)
@@ -919,17 +919,17 @@ func (s *mockRepoService) FindSimilarContent(c *gin.Context, id, cType string) (
 	return nil, nil, nil
 }
 
-func (s *mockRepoService) AddContentToFavorites(c *gin.Context, IMDB, cType string) error {
+func (s *mockRepoService) AddContentToFavorites(c *gin.Context, IMDB, cType, username string) error {
 
-	args := s.Called(c, "", "")
+	args := s.Called(c, "", "", "")
 	return args.Error(0)
 }
 
-func (s *mockRepoService) GetFavoriteContents(c *gin.Context, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) GetFavoriteContents(c *gin.Context, page, items int, username string) (*[]model.Movie, *[]model.Series, error) {
 	return nil, nil, nil
 }
 
-func (s *mockRepoService) SearchFavorites(c *gin.Context, name string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
+func (s *mockRepoService) SearchFavorites(c *gin.Context, name, username string, genres []string, page, items int) (*[]model.Movie, *[]model.Series, error) {
 	return nil, nil, nil
 }
 

@@ -33,7 +33,7 @@ func FindIDWithIMDB(imdbID string) (int, error) {
 	}
 	_, after, ok := strings.Cut(string(read), "\"id\":")
 	if !ok {
-		return 0, fmt.Errorf("id not found", string(read))
+		return 0, fmt.Errorf("id not found %s", string(read))
 	}
 	before, _, ok := strings.Cut(after, ",")
 	if !ok {
@@ -138,7 +138,7 @@ func GetMovie(id int) *model.Movie {
 		}
 	}
 
-	log.Println(ret.Title, " movie has been succesfully fetched")
+	log.Println(*ret.Title, " movie has been succesfully fetched")
 	return &ret
 }
 

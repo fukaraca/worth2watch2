@@ -2,77 +2,18 @@ package db_test
 
 import (
 	"errors"
-	"github.com/fukaraca/worth2watch2/config"
+	"fmt"
 	"github.com/fukaraca/worth2watch2/db"
 	"github.com/fukaraca/worth2watch2/model"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 )
 
-var (
-	//conn        *pgxpool.Pool
-	adminSampleString    = "adminSampleString"
-	nonAdminSampleString = "nonAdminSampleString"
-	sampleString1        = "sampleString1"
-	sampleString2        = "sampleString2"
-	sampleTimestamp      = pgtype.Timestamptz{Status: pgtype.Present, Time: time.Now(), InfinityModifier: pgtype.None}
-	test_db_Host         = config.GetEnv.GetString("TEST_DB_HOST")
-	test_db_Port         = config.GetEnv.GetString("TEST_DB_PORT")
-	test_db_Name         = config.GetEnv.GetString("TEST_DB_NAME")
-	test_db_User         = config.GetEnv.GetString("TEST_DB_USER")
-	test_db_Password     = config.GetEnv.GetString("TEST_DB_PASSWORD")
-	db_InitSQL_Location  = config.GetEnv.GetString("INIT_SQL_LOC")
-)
+func testCreateNewUser(t *testing.T) {
 
-var movie_list = []string{"tt0120737", "tt0111161", "tt0068646", "tt0468569", "tt0071562", "tt0050083", "tt0108052", "tt0167260"}
-
-//var series_list = []string{"tt0108778", "tt0944947", "tt1286039", "tt2294189", "tt4635282", "tt0460091", "tt2375692", "tt0092400"} //long series
-var series_list = []string{"tt11324406", "tt10234724", "tt13729648"}
-
-type mockRepo struct {
-	db.Repository
-}
-
-var testDB *mockRepo
-
-func setupTestRepository() *mockRepo {
-	var mockDB = &mockRepo{db.NewTestDB(test_db_Host, test_db_Port, test_db_User, test_db_Password, test_db_Name, db_InitSQL_Location)}
-	//insertTables(mockDB)
-	return mockDB
-}
-
-func fillInTheTables(mockDB *mockRepo) {
-	for _, m := range movie_list {
-		mockDB.AddMovieContentWithID(m)
-	}
-	for _, s := range series_list {
-		mockDB.AddSeriesContentWithID(s)
-	}
-}
-
-func newContext() *gin.Context {
-	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = &http.Request{}
-	return c
-}
-
-func TestMain(m *testing.M) {
-	testDB = setupTestRepository()
-	defer testDB.CloseDB()
-	run := m.Run()
-	db.Truncate()
-	os.Exit(run)
-}
-
-func TestCreateNewUser(t *testing.T) {
-	var err error
 	c := newContext()
 	cases := []struct {
 		name           string
@@ -104,18 +45,173 @@ func TestCreateNewUser(t *testing.T) {
 			notExpectedErr: errors.New("FAIL"), //not equal will be used
 			msg:            "it's not expected to return err",
 		},
+		{
+			name:           "case for arbitrary non-admin pass!=username insertion",
+			user:           &uniqueUser,
+			notExpectedErr: errors.New("FAIL"), //not equal assertion will be used
+			msg:            "it's not expected to return err",
+		},
 	}
 
 	for _, s := range cases {
-		err = testDB.CreateNewUser(c, s.user)
+		err := testDB.CreateNewUser(c, s.user)
 		assert.NotEqual(t, s.notExpectedErr, err, s.msg)
 	}
 }
 
-func TestQueryLogin(t *testing.T) {
+func testQueryLogin(t *testing.T) {
 	c := newContext()
 
-	pass, err := testDB.QueryLogin(c, adminSampleString)
-	assert.Equal(t, adminSampleString, pass)
+	cases := []struct {
+		name        string
+		username    string
+		expectedErr error
+		password    string
+		msg         string
+	}{
+		{
+			name:        "happy case for username==password user that inserted just in TestCreateNewUser func",
+			username:    adminSampleString,
+			expectedErr: nil,
+			password:    adminSampleString,
+			msg:         "we didn't expect an error",
+		},
+		{
+			name:        "not happy case for username!=password user that inserted just in TestCreateNewUser func",
+			username:    uniqueUser.Username,
+			expectedErr: fmt.Errorf("username not found"),
+			password:    uniqueUser.Password,
+			msg:         "we expect an error says username not found",
+		},
+	}
+	for _, s := range cases {
+		pass, err := testDB.QueryLogin(c, s.username)
+		assert.Equal(t, s.password, pass)
+		assert.Equal(t, nil, err)
+	}
+
+}
+
+func testIsAdmin(t *testing.T) {
+	c := newContext()
+	gin.SetMode(gin.DebugMode)
+
+	cases := []struct {
+		name         string
+		username     string
+		expectedErr  error
+		expectedBool bool
+		msg          string
+	}{
+		{
+			name:         "happy case for admin",
+			username:     adminSampleString,
+			expectedErr:  nil,
+			expectedBool: true,
+			msg:          "it's expected to return no err and true",
+		},
+		{
+			name:         "happy case for non-admin",
+			username:     nonAdminSampleString,
+			expectedErr:  nil,
+			expectedBool: false,
+			msg:          "it's expected to return no err and false",
+		},
+		{
+			name:         "non-happy case for non-existed username",
+			username:     "some username",
+			expectedErr:  pgx.ErrNoRows,
+			expectedBool: false,
+			msg:          "it's expected to return err and false",
+		},
+	}
+
+	for _, s := range cases {
+		ok, err := db.IsAdmin(c, s.username)
+		assert.Equal(t, s.expectedBool, ok, s.msg)
+		assert.Equal(t, s.expectedErr, err, s.msg)
+	}
+}
+
+func testUpdateLastLogin(t *testing.T) {
+	c := newContext()
+	err := testDB.UpdateLastLogin(c, uniqueUser.LastLogin.Time.Add(5*time.Second), uniqueUser.Username)
+	//we don't expect any error unless db fails
 	assert.Equal(t, nil, err)
+}
+
+func testUpdateUserInfo(t *testing.T) {
+	c := newContext()
+	//we will add name and lastname to non-admin user that's created on TestNewUserCreate
+	err := testDB.UpdateUserInfo(c, nonAdminSampleString+"Name", nonAdminSampleString+"Lastname", nonAdminSampleString)
+	//we don't expect any error unless db fails
+	assert.Equal(t, nil, err)
+}
+
+func testQueryUserInfo(t *testing.T) {
+	c := newContext()
+	//Now we can check users that2s created before
+	cases := []struct {
+		name         string
+		username     string
+		expectedUser *model.User
+		expectedErr  error
+		msg          string
+	}{
+		{
+			name:         "check admin user's some fields",
+			username:     adminSampleString,
+			expectedUser: &model.User{Username: adminSampleString, Password: adminSampleString, Isadmin: true},
+			expectedErr:  nil,
+			msg:          "we dont expect any error",
+		},
+		{
+			name:         "check unique user's some fields",
+			username:     uniqueUser.Username,
+			expectedUser: &uniqueUser,
+			expectedErr:  nil,
+			msg:          "we dont expect any error",
+		},
+		{
+			name:         "check non-admin user's some fields",
+			username:     nonAdminSampleString,
+			expectedUser: &model.User{Username: nonAdminSampleString, Password: nonAdminSampleString, Isadmin: false},
+			expectedErr:  nil,
+			msg:          "we dont expect any error",
+		},
+		{
+			name:         "check for not-existed user",
+			username:     "some user",
+			expectedUser: nil,
+			expectedErr:  pgx.ErrNoRows,
+			msg:          "we dont expect any error",
+		},
+	}
+
+	for _, s := range cases {
+		user, err := testDB.QueryUserInfo(c, s.username)
+		if err != nil {
+			assert.Equal(t, s.expectedErr, err)
+			continue
+		}
+		assert.Equal(t, s.expectedErr, err)
+		assert.Equal(t, s.expectedUser.Username, user.Username)
+		assert.Equal(t, "", user.Password, "we don't expect it return password with user infos")
+		assert.Equal(t, s.expectedUser.Isadmin, user.Isadmin)
+
+		//since we time traveled unique user by 5 seconds in TestUpdateLastLogin func we can check it now
+		if s.username == uniqueUser.Username {
+			userLastLogin := user.LastLogin.Time.Second()
+			if userLastLogin < 5 {
+				userLastLogin += 60
+			}
+			assert.Equal(t, 5*time.Second.Seconds(), float64(userLastLogin-s.expectedUser.LastLogin.Time.Second()), "it's expected to return 5 second later of variable definition")
+		}
+
+		//since we update user's first and lastnameint TestUpdateUserInfo func, we can confirm it now
+		if user.Username == nonAdminSampleString {
+			assert.Equal(t, nonAdminSampleString+"Name", *user.Name)
+			assert.Equal(t, nonAdminSampleString+"Lastname", *user.Lastname)
+		}
+	}
 }

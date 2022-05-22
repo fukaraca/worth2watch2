@@ -609,7 +609,8 @@ func (s *service) addToFavorites(c *gin.Context) {
 		})
 		return
 	}
-	err := s.AddContentToFavorites(c, id, contentType)
+	username, _ := c.Cookie("uid")
+	err := s.AddContentToFavorites(c, id, contentType, username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"notification": err.Error(),
@@ -646,8 +647,8 @@ func (s *service) getFavorites(c *gin.Context) {
 			return
 		}
 	}
-
-	movies, series, err := s.GetFavoriteContents(c, page, items)
+	username, _ := c.Cookie("uid")
+	movies, series, err := s.GetFavoriteContents(c, page, items, username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"notification": "en error occurred",
@@ -706,8 +707,9 @@ func (s *service) searchFavorites(c *gin.Context) {
 			return
 		}
 	}
+	username, _ := c.Cookie("uid")
 	//db query not a handler
-	movies, series, err := s.SearchFavorites(c, name, genres, page, items)
+	movies, series, err := s.SearchFavorites(c, name, username, genres, page, items)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"notification": "en error occurred",
