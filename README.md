@@ -6,16 +6,16 @@
 
 
 **Worth2watch2** is a better version of [worth2watch](https://github.com/fukaraca/worth2watch)
-project which was functional and OK. However it was also hard by testing and maintaining manner.
+project which was functional and... OK... Yet, it was hard by testing and maintaining manner.
 
 In this project, it's aimed to build a RESTFUL, functional, testable, maintainable application that manages back-end needs of a movie/series database. 
 
 Features:
-- You can handle account management
-- You can manage contents with admin role by adding with IMDB-ID, raw-JSON and delete content by IMDB-ID
-- Users can add/delete movie/series to their Favorites and search by genre and content name
-- By public access, any guest can request movies list , a specific movie, series list, a specific series along with its seasons and episodes. 
-- Additionally, the guest can search by genre and content name.
+- Account management
+- Handling contents with admin role by adding with IMDB-ID, raw-JSON and deleting content by IMDB-ID
+- Operations of add, delete movie/series to favorites in relational manner for related user and search by genre and content name
+- By public access, being able to request movies list , a specific movie, series list, a specific series along with its seasons and episodes. 
+- By public access, searching by genre and content name.
 - Dockerized application, PostgreSQL and Redis by docker-compose.
 - Unit tested...
 - Aimed to follow clean code and SOLID principles.
@@ -35,20 +35,20 @@ git clone https://github.com/fukaraca/worth2watch2.git
 
 Now, PostgreSQL, Redis and application must be running. 
 
-In case of using local Psql and Redis, You may need to create a database and name it in accordance with config.env>>DB_NAME value. 
+In case of using local PostgreSQL and Redis, you may need to create a database and name it in accordance with config.env>>DB_NAME value. 
 Also you must uncomment the stated lines on config.env properly and delete the prioring keys.
-This is a must because former values were for Dockerized option. Since you are using localhost as DB_HOST, it needs to be changed.  
+This is a must because former values were for fully Dockerized option. Since you are using localhost as DB_HOST environment, it needs to be changed.  
 And now, you can simply 
 
 ` go run .`
 
-On initial run, application will create required tables automatically, you only need to register, log-in, and add-content you wish to.
+On initial run, application will create required tables automatically, only left for you is registering, logging-in, and adding-content as you wish to.
 
 ## Testing
 
-You can simply call `make testall` for Unix based OS users. 
+For Unix based OS users, all you need to type is `make testall` . 
 
-For Windows users who don't have GNU-make `go test -v ./..` command may be used,  *but ownership constraints of `./db/volume/` folder must be awared of . 
+For Windows users who don't have GNU-make as installed `go test -v ./..` command may be used,  *but ownership constraints of `./db/volume/` folder must be awared of . 
 
 
 
