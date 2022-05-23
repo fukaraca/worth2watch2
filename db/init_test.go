@@ -39,7 +39,7 @@ var (
 	test_db_Name        = config.GetEnv.GetString("TEST_DB_NAME")
 	test_db_User        = config.GetEnv.GetString("TEST_DB_USER")
 	test_db_Password    = config.GetEnv.GetString("TEST_DB_PASSWORD")
-	db_InitSQL_Location = config.GetEnv.GetString("INIT_SQL_LOC")
+	db_InitSQL_Location = config.GetEnv.GetString("TEST_INIT_SQL_LOC")
 )
 
 var movie_list = []string{"tt0120737", "tt0111161", "tt0068646", "tt0468569", "tt0071562", "tt0050083", "tt0108052", "tt0167260"}
@@ -78,6 +78,7 @@ func TestMain(m *testing.M) {
 	os.Exit(run)
 }
 
+//TestAllBySequentially is wrapper for all test functions for DB queries. This method is followed for brevity to make unit test easier.
 func TestAllBySequentially(t *testing.T) {
 	//test account-management.go
 	testCreateNewUser(t)

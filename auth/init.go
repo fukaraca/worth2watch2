@@ -55,6 +55,7 @@ func (chc *authImp) CloseCacheConnection() {
 	}
 }
 
+//NewCache returns cache as initiated status
 func NewCache() *authImp {
 	client := &authImp{}
 	client.initializeCache()

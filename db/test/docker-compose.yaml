@@ -1,11 +1,11 @@
 version: '3.8'
 services:
-  postgresdb:
-    container_name: test-postgresdb-container
+  testpostgresdb:
+    container_name: test-postgres-container
     image: postgres:14.2-alpine
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=test_postgres
+      - POSTGRES_PASSWORD=test_postgres
     ports:
       - '5433:5432'
     volumes:

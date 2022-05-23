@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   postgresdb:
+    container_name: w2w2_postgres
     image: postgres:14.2-alpine
     environment:
       - POSTGRES_USER=postgres
@@ -13,6 +14,7 @@ services:
     networks:
       - mynet
   rediscache:
+    container_name: w2w2_redis
     image: redis:alpine
     restart: on-failure
     ports:
@@ -20,6 +22,7 @@ services:
     networks:
       - mynet
   app:
+    container_name: worth2watch2_app
     build:
       context: .
       dockerfile: Dockerfile
