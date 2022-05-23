@@ -6,7 +6,7 @@
 
 
 **Worth2watch2** is a better version of [worth2watch](https://github.com/fukaraca/worth2watch)
-project which was hard by testing and maintaining manner.
+project which was functional and OK. However it was also hard by testing and maintaining manner.
 
 In this project, it's aimed to build a RESTFUL, functional, testable, maintainable application that manages back-end needs of a movie/series database. 
 
